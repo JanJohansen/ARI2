@@ -1,0 +1,15 @@
+{
+  //"exclude": [
+   // "node_modules" // we need to tell the transpiler to stay away from this here also
+  //],
+  "compilerOptions": {
+    "target": "ES6", // specify that we want Typescript compiled to ES5
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "emitDecoratorMetadata": true, // in order to use Angular 2 decorators in TypeScript
+    "experimentalDecorators": true, // in order to use Angular 2 decorators in TypeScript
+    "removeComments": false,
+    "noImplicitAny": false // allows us to use the 'any'-type without errors
+  }
+}
