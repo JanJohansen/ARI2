@@ -13,7 +13,7 @@
             "runtimeExecutable": null,
             "runtimeArgs": [ "--nolazy" ],
             "env": { "NODE_ENV": "development" },
-            "externalConsole": true,
+            "console": "externalTerminal",
             "sourceMaps": true,
             "outDir": "${workspaceRoot}/dist/server"
         }

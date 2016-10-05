@@ -12,7 +12,11 @@ export class loggingService {
     static listeners: Object = {};
     static defaultLevel = "info";
 
-    static getLogger(name: string, level?: string): loggerInstance {
+
+        /**
+         * Get a logger thing...
+         */
+        static getLogger(name: string, level?: string): loggerInstance {
         if(!this.loggers[name]){
             if(!level) level = loggingService.defaultLevel;
             let logger = new loggerInstance(name, level);
@@ -23,6 +27,9 @@ export class loggingService {
 
     static logInput(logger: loggerInstance, level: number,  ...args){
         // Filter on loggerInstance level...
+
+        // TODO: Change to use logging level for writers instead of for loggers.!!
+
         if(level >= logger.level) {
             this.logWriters.forEach(writer => {
                 writer.handleLogInput(logger, loggingService.levelToString(level), ...args);
