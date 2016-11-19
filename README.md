@@ -1,5 +1,5 @@
 #ARI 2.0
-** Home Automation**  
+**Home Automation**  
 using an advanced "Automation Routing Infrastructure"
 
 ## How to install:
