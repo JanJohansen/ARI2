@@ -1,12 +1,17 @@
-# How to install:
-Install [nodejs](http://www.nodejs.org)
-Install typings package manager: 
-    
-    npm install tsd -g
-Install typings definitions in project: 
-    
-    tsd install
+#ARI 2.0
+** Home Automation**  
+using an advanced "Automation Routing Infrastructure"
 
-Clear npm global cache:
+## How to install:
+* Install [nodejs](http://www.nodejs.org)
+```
+npm install tsd -g  // Install typings package manager: 
+tsd install         // Install typings definitions in project: 
+npm install         // Download dependencies
+npm start           // Start server
+```
 
-    Windows: delete contents in C:\Users\<username>\AppData\Roaming\npm
+## Developer?
+`npm run dev         // Start development scripts`
+
+Start hacking :O)
