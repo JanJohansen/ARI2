@@ -62,6 +62,6 @@
     "watch_browsersync": "browser-sync start --config bs-config.js",
     "watch_typescript": "tsc -w",
     "dev": "concurrently \"npm run watch_typescript\" \"npm run watch_copy_app\" \"npm run watch_browsersync\"",
-    "start": "npm run dev"
+    "start": "node ./dist/server/main.js"
   }
 }
