@@ -12,6 +12,6 @@ npm start           // Start server
 ```
 
 ## Developer?
-`npm run dev         // Start development scripts`
+`npm run dev        // Start development scripts`
 
 Start hacking :O)
