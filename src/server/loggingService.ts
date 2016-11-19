@@ -16,7 +16,7 @@ export class loggingService {
         /**
          * Get a logger thing...
          */
-        static getLogger(name: string, level?: string): loggerInstance {
+    static getLogger(name: string, level?: string): loggerInstance {
         if(!this.loggers[name]){
             if(!level) level = loggingService.defaultLevel;
             let logger = new loggerInstance(name, level);

@@ -16,6 +16,11 @@ Generic reset.
 	font-style: italic;
 }
 
+.svg-menu-item{
+	background: black;
+	fill: blue;
+}
+
 /*
 Styles for nodes and connectors.
 */
@@ -68,7 +73,7 @@ Style for connections.
 }	
 
 .mouseover-connection-line {
-	stroke: gray;
+	stroke: black;
 	stroke-width: 6;
 	fill: transparent;
 }	
@@ -111,7 +116,8 @@ Style for the connection being dragged out.
 }
 
 .dragging-connection-line {
-	stroke: gray;
+	pointer-events: none;
+	stroke: green; 
 	stroke-width: 3;
 	fill: transparent;
 }	
@@ -137,3 +143,6 @@ Drag selection rectangle.
 	stroke-width: 2;
 	fill: transparent;
 }
+
+/*****************************************************/
+

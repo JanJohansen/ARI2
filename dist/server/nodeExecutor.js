@@ -1,87 +1,93 @@
 "use strict";
-const loggingService_1 = require('./loggingService');
+var loggingService_1 = require('./loggingService');
 var log = loggingService_1.loggingService.getLogger("nodeExecutor");
-class nodeExecutor {
-    constructor() {
+var nodeExecutor = (function () {
+    function nodeExecutor() {
         this.functionBlocks = [];
         log.trace("Trace test!");
         log.info("NodeExecutor started...");
         this.loadFunctionBlocks();
     }
-    loadFunctionBlocks() {
-        let lib = require('./lib_misc');
+    nodeExecutor.prototype.loadFunctionBlocks = function () {
+        var lib = require('./lib_misc');
         //log.info(lib);
         for (var key in lib) {
-            let libClass = lib[key];
+            var libClass = lib[key];
             log.info("--------");
             log.info("Function:", key);
             log.info("Display name:", libClass.displayName);
             log.info("Description:", libClass.description);
             this.functionBlocks.push({ name: key, functionClass: libClass });
         }
-    }
-    getFunctions() {
+    };
+    nodeExecutor.prototype.getFunctions = function () {
         return this.functionBlocks;
-    }
-    static connect(output, input) {
-        output.addListener((data) => {
+    };
+    nodeExecutor.connect = function (output, input) {
+        output.addListener(function (data) {
             input.value = data;
         });
-    }
-    disconnect(output, input) {
-        output.addListener((data) => {
+    };
+    nodeExecutor.prototype.disconnect = function (output, input) {
+        output.addListener(function (data) {
             input.value = data;
         });
-    }
-}
+    };
+    return nodeExecutor;
+}());
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = nodeExecutor;
-class nodeIOBase {
-    constructor(name, type, description) {
+var nodeIOBase = (function () {
+    function nodeIOBase(name, type, description) {
         this.listeners = [];
         this.name = name;
         this.type = type;
         this.description = description;
     }
-    get value() {
-        return this._value;
-    }
-    set value(value) {
-        this._value = value;
-        this.listeners.forEach(callback => {
-            callback(value);
-        });
-    }
-    addListener(callback) {
+    Object.defineProperty(nodeIOBase.prototype, "value", {
+        get: function () {
+            return this._value;
+        },
+        set: function (value) {
+            this._value = value;
+            this.listeners.forEach(function (callback) {
+                callback(value);
+            });
+        },
+        enumerable: true,
+        configurable: true
+    });
+    nodeIOBase.prototype.addListener = function (callback) {
         this.listeners.push(callback);
-    }
+    };
     ;
-    removeListener(callback) {
+    nodeIOBase.prototype.removeListener = function (callback) {
         this.listeners.splice(this.listeners.indexOf(callback), 1);
-    }
+    };
     ;
-}
+    return nodeIOBase;
+}());
 exports.nodeIOBase = nodeIOBase;
-class nodeBase {
-    constructor(uid) {
+var nodeBase = (function () {
+    function nodeBase(uid) {
         this.inputs = [];
         this.outputs = [];
         this.uid = uid;
         nodeBase.description = "";
     }
-    createInput(name, type, description) {
-        let input = new nodeIOBase(name, type, description);
+    nodeBase.prototype.createInput = function (name, type, description) {
+        var input = new nodeIOBase(name, type, description);
         this.inputs.push(input);
         return input;
-    }
-    createOutput(name, type, description) {
-        let output = new nodeIOBase(name, type, description);
+    };
+    nodeBase.prototype.createOutput = function (name, type, description) {
+        var output = new nodeIOBase(name, type, description);
         this.outputs.push(output);
         return output;
-    }
-}
-nodeBase.displayName = "Anonymous";
-nodeBase.description = "";
+    };
+    nodeBase.displayName = "Anonymous";
+    nodeBase.description = "";
+    return nodeBase;
+}());
 exports.nodeBase = nodeBase;
-
-//# sourceMappingURL=nodeExecutor.js.map
+//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/server/nodeExecutor.js.map

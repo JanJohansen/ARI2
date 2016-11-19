@@ -1,0 +1,117 @@
+<!-- SVG:SVG MSUT be first element due to hack to get SVG element!!! -->
+<svg:svg 
+    viewBox="0 0 900 500" 
+    tabindex='1'
+    preserveAspectRatio="xMidYMid meet"
+    (mousedown)="svgMouseDown($event)"
+    (mousemove)="svgMouseMove($event)"
+    (mouseup)="svgMouseUp($event)"
+    (mouse-wheel-up)="mouseWheelUp($event)"
+    (mouse-wheel-down)="mouseWheelDown($event)"
+    (keydown)="svgKeyDown($event)"
+    oncontextmenu="return false;"
+>
+    <!-- Set tabIndex to allow keyboard events! What a hack! -->
+    <!-- Return false on onContextMenu to prevent default browser menu! -->
+    <defs>
+        <linearGradient 
+            spreadMethod="pad" 
+            y2="0" 
+            x2="0" 
+            y1="1" 
+            x1="0" 
+            id="nodeBackgroundGradient"
+        >
+            <stop offset="0" stop-color="#dddddd" />
+            <stop offset="0.6" stop-color="#f7f7f7" />
+        </linearGradient>
+    </defs>
+    <svg:g *ngFor="let node of flow.nodes"
+        (mousedown)="nodeMouseDown($event, node)"
+        (click)="nodeClick($event, node)"
+        [attr.transform]="'translate(' + node.x + ',' + node.y + ')'"
+    >
+        <svg:rect 
+            [attr.class]="'node-rect ' + (nodeSelected(node) && 'selected-node-rect') || (node == mouseOverNode && 'mouseover-node-rect')"
+            ry="5" 
+            rx="5" 
+            x="0" 
+            y="0" 
+            [attr.width]="node.width" 
+            [attr.height]="maxIOs(node) * 25 + 30" 
+            fill="url(#nodeBackgroundGradient)" 
+        />
+
+        <svg:text
+            class="node-name-text"
+            [attr.x]="node.width/2"
+            y="10"
+            text-anchor="middle"
+            alignment-baseline="middle"
+        >
+            {{node.name}}
+        </svg:text>
+
+        <svg:g *ngFor="let input of node.inputs; let i=index"
+            (mousedown)="inputMouseDown(node, i)"
+            (mouseup)="inputMouseUp(node, i)"
+        >
+            <svg:circle
+                [attr.class]="connector == mouseOverConnector && 'mouseover-connector-circle' || 'connector-circle'"
+                r=10 
+                cx=0
+                [attr.cy]="35 + i * 25"
+            />
+            <svg:text 
+                dominant-baseline="central"
+                x=15
+                [attr.y]=35+i*25
+            >
+                {{input.name}}
+            </svg:text>
+        </svg:g>
+
+        <svg:g *ngFor="let output of node.outputs; let i=index"
+            (mousedown)="outputMouseDown(node, i)"
+            (mouseup)="outputMouseUp(node, i)"
+        >
+            <svg:circle
+                [attr.class]="connector == mouseOverConnector && 'mouseover-connector-circle' || 'connector-circle'"
+                r=10 
+                [attr.cx]="node.width"
+                [attr.cy]="35 + i * 25"
+            />
+            <svg:text 
+                dominant-baseline="central"
+                text-anchor="end"
+                [attr.x]="node.width - 15"
+                [attr.y]=35+i*25
+            >
+                {{output.name}}
+            </svg:text>
+        </svg:g>
+    </svg:g>
+
+    <template ngFor let-node [ngForOf]="flow.nodes">
+        <template ngFor let-out [ngForOf]="node.outputs" let-oi="index">
+            <template ngFor let-connection [ngForOf]="out.connect" let-i="index">
+                <svg:path
+                    (mousedown)="connectionMouseDown(node, out, oi, i, $event)"
+                    [attr.class]="'connection-line'"
+                    [attr.d]= "getConnectionPath(node, out, connection, oi)"
+                >
+                </svg:path>
+            </template>
+        </template>
+    </template>
+
+    <svg:path *ngIf="flow._newConnection"
+        class="dragging-connection-line"
+        [attr.d]= "getNewConnectionPath(flow._newConnection.x1, flow._newConnection.y1, flow._newConnection.x2, flow._newConnection.y2)"
+    >
+    </svg:path>
+</svg:svg>
+
+<!-- Context Menu for flow designer... -->
+<jj-context-menu (menuSelected)="menuSelected($event);" >
+</jj-context-menu>
