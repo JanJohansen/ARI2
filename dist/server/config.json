@@ -38,7 +38,7 @@
 				"call": [ ],
 				"authorise": [ ]
 			}
-		}
+		},
 		{
 			"name": "guest",
 			"permissions": {

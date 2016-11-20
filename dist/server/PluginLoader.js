@@ -4,21 +4,19 @@ var AriEventEmitter_1 = require('./AriEventEmitter');
 var fs = require("fs");
 var cp = require('child_process');
 // Logging instance for Main...
-var log = loggingService_1.loggingService.getLogger("PluginLoader", "trace");
-var ariEvents = AriEventEmitter_1.default.getInstance();
 var PluginLoader = (function () {
     function PluginLoader() {
+    }
+    PluginLoader.start = function () {
         var _this = this;
-        this.pluginsPath = __dirname + "/plugins";
-        this.pluginInfos = {};
-        log.debug("Starting PluginLoader.");
-        this.LoadPluginInfo();
-        ariEvents.on("pluginLoader.newPluginInfo", function (pluginInfo) {
-            log.trace("New plugin detected.");
+        PluginLoader.LoadPluginInfo();
+        PluginLoader.ariEvents.on("pluginLoader.newPluginInfo", function (pluginInfo) {
+            PluginLoader.log.trace("New plugin detected.");
+            // TODO: check if we should actually start the plugin according to user settings. (enabled / disabled!)
             _this.LoadPlugin(pluginInfo);
         });
-    }
-    PluginLoader.prototype.LoadPluginInfo = function () {
+    };
+    PluginLoader.LoadPluginInfo = function () {
         var _this = this;
         return new Promise(function (resolve, reject) {
             var self = _this;
@@ -46,7 +44,7 @@ var PluginLoader = (function () {
                                         if (!manifest.AriPluginInfo.debugFilePath)
                                             manifest.AriPluginInfo.debugFilePath = manifest.AriPluginInfo.pluginPath;
                                         self.pluginInfos[dir] = manifest.AriPluginInfo;
-                                        ariEvents.emit("pluginLoader.newPluginInfo", manifest.AriPluginInfo);
+                                        PluginLoader.ariEvents.emit("pluginLoader.newPluginInfo", manifest.AriPluginInfo);
                                     }
                                 }
                             });
@@ -57,32 +55,41 @@ var PluginLoader = (function () {
             });
         });
     };
-    PluginLoader.prototype.LoadPlugin = function (plugin) {
+    PluginLoader.LoadPlugin = function (plugin) {
         if (!(plugin.name && plugin.main)) {
-            log.error("Error in configuration file when loading plugin.");
+            PluginLoader.log.error("Error in configuration file when loading plugin.");
             return;
         }
-        log.info("Loading plugin:", plugin.name);
-        // Child will use parent's stdios
-        if (!plugin.arguments)
-            plugin.arguments = "";
-        var args = [plugin.main].concat(plugin.args.split(" "));
-        var pluginProcess = cp.spawn("node", args, { "cwd": plugin.pluginPath });
-        pluginProcess.stdout.on('data', function (data) {
-            console.log("/" + plugin.name + ":", data.toString());
-            plugin.stdout += data.toString();
-        });
-        pluginProcess.stderr.on('data', function (data) {
-            console.log(plugin.name + " ERROR:", data.toString());
-            plugin.errout += data.toString();
-        });
-        pluginProcess.on('close', function (code) {
-            console.log(plugin.name + " exit!:", code.toString());
-            // TODO: Implement restart plugin n times before reporting error?
-            //saveDebug(false);
-        });
-        ariEvents.emit("pluginLoader.pluginLoaded", plugin.name);
+        PluginLoader.log.info("Loading plugin:", plugin.name);
+        if (PluginLoader.loadLocal) {
+            require(plugin.pluginPath + "/" + plugin.main);
+        }
+        else {
+            if (!plugin.arguments)
+                plugin.arguments = "";
+            var args = [plugin.main].concat(plugin.args.split(" "));
+            var pluginProcess = cp.spawn("node", args, { "cwd": plugin.pluginPath });
+            pluginProcess.stdout.on('data', function (data) {
+                console.log("/" + plugin.name + ":", data.toString());
+                plugin.stdout += data.toString();
+            });
+            pluginProcess.stderr.on('data', function (data) {
+                console.log(plugin.name + " ERROR:", data.toString());
+                plugin.errout += data.toString();
+            });
+            pluginProcess.on('close', function (code) {
+                console.log(plugin.name + " exit!:", code.toString());
+                // TODO: Implement restart plugin n times before reporting error?
+                //saveDebug(false);
+            });
+            PluginLoader.ariEvents.emit("pluginLoader.pluginLoaded", plugin.name);
+        }
     };
+    PluginLoader.pluginsPath = __dirname + "/plugins";
+    PluginLoader.pluginInfos = {};
+    PluginLoader.ariEvents = AriEventEmitter_1.default.getInstance();
+    PluginLoader.log = loggingService_1.loggingService.getLogger("PluginLoader");
+    PluginLoader.loadLocal = true; // Set this to load plugins into existing V8 engine instead of spawning a new process.
     return PluginLoader;
 }());
 Object.defineProperty(exports, "__esModule", { value: true });

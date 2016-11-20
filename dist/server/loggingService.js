@@ -1,48 +1,33 @@
-//import colors from 'colors';
-//import { EventEmitter } from 'events';
 "use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-//console.log("colors:", colors);
-/*
-* loggingService
-*/
 var loggingService = (function () {
     function loggingService() {
     }
-    /**
-     * Get a logger thing...
-     */
-    loggingService.getLogger = function (name, level) {
+    loggingService.getLogger = function (name) {
         if (!this.loggers[name]) {
-            if (!level)
-                level = loggingService.defaultLevel;
-            var logger = new loggerInstance(name, level);
+            var logger = new loggerInstance(name);
             this.loggers[name] = logger;
             return logger;
         }
         else
             return this.loggers[name];
     };
-    loggingService.logInput = function (logger, level) {
-        // Filter on loggerInstance level...
+    loggingService.logInput = function (loggerName, level) {
         var args = [];
         for (var _i = 2; _i < arguments.length; _i++) {
             args[_i - 2] = arguments[_i];
         }
-        // TODO: Change to use logging level for writers instead of for loggers.!!
-        if (level >= logger.level) {
-            this.logWriters.forEach(function (writer) {
-                writer.handleLogInput.apply(writer, [logger, loggingService.levelToString(level)].concat(args));
+        this.logWriters.forEach(function (writer) {
+            writer.handleLogInput.apply(writer, [loggerName, level].concat(args));
+        });
+        if (loggingService.listeners[loggerName]) {
+            loggingService.listeners[loggerName].forEach(function (callback) {
+                callback.apply(void 0, [loggerName, loggingService.levelToString(level)].concat(args));
             });
-            if (loggingService.listeners[logger.name]) {
-                loggingService.listeners[logger.name].forEach(function (callback) {
-                    callback.apply(void 0, [logger, loggingService.levelToString(level)].concat(args));
-                });
-            }
         }
     };
     loggingService.levelToString = function (level) {
@@ -67,17 +52,13 @@ var loggingService = (function () {
             loggingService.listeners[loggerName] = [];
         loggingService.listeners[loggerName].push(callback);
     };
-    loggingService.setLevel = function (loggerName, level) {
-        var logger = this.getLogger(loggerName, level);
-        logger.setLevel(level);
-    };
     loggingService.setDefaultLevel = function (level) {
-        loggingService.defaultLevel = level;
+        loggingService.defaultLevel = loggingService.levels[level];
     };
     loggingService.loggers = [];
     loggingService.logWriters = [];
     loggingService.listeners = {};
-    loggingService.defaultLevel = "info";
+    loggingService.defaultLevel = 300;
     loggingService.levels = {
         trace: 100,
         debug: 200,
@@ -90,67 +71,70 @@ var loggingService = (function () {
 }());
 exports.loggingService = loggingService;
 var loggerInstance = (function () {
-    function loggerInstance(name, level) {
+    function loggerInstance(name) {
         this.name = name;
-        if (level)
-            this.setLevel(level);
-        else
-            this.setLevel(loggingService.defaultLevel);
     }
-    loggerInstance.prototype.setLevel = function (level) {
-        if (loggingService.levels[level])
-            this.level = loggingService.levels[level];
-        // else ignore!?
-    };
     loggerInstance.prototype.trace = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i - 0] = arguments[_i];
         }
-        loggingService.logInput.apply(loggingService, [this, loggingService.levels.trace].concat(args));
+        loggingService.logInput.apply(loggingService, [this.name, loggingService.levels.trace].concat(args));
     };
     loggerInstance.prototype.debug = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i - 0] = arguments[_i];
         }
-        loggingService.logInput.apply(loggingService, [this, loggingService.levels.debug].concat(args));
+        loggingService.logInput.apply(loggingService, [this.name, loggingService.levels.debug].concat(args));
     };
     loggerInstance.prototype.info = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i - 0] = arguments[_i];
         }
-        loggingService.logInput.apply(loggingService, [this, loggingService.levels.info].concat(args));
+        loggingService.logInput.apply(loggingService, [this.name, loggingService.levels.info].concat(args));
     };
     loggerInstance.prototype.warn = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i - 0] = arguments[_i];
         }
-        loggingService.logInput.apply(loggingService, [this, loggingService.levels.warn].concat(args));
+        loggingService.logInput.apply(loggingService, [this.name, loggingService.levels.warn].concat(args));
     };
     loggerInstance.prototype.error = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i - 0] = arguments[_i];
         }
-        loggingService.logInput.apply(loggingService, [this, loggingService.levels.error].concat(args));
+        loggingService.logInput.apply(loggingService, [this.name, loggingService.levels.error].concat(args));
     };
     loggerInstance.prototype.fatal = function () {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
             args[_i - 0] = arguments[_i];
         }
-        loggingService.logInput.apply(loggingService, [this, loggingService.levels.fatal].concat(args));
+        loggingService.logInput.apply(loggingService, [this.name, loggingService.levels.fatal].concat(args));
     };
     return loggerInstance;
 }());
 var logWriterBase = (function () {
-    function logWriterBase(configuration) {
-        if (configuration === void 0) { configuration = {}; }
+    function logWriterBase(config) {
+        if (config === void 0) { config = {}; }
+        this.levels = {}; // log level for each incoming loggerinstance.
+        this.config = config;
     }
-    logWriterBase.prototype.handleLogInput = function (logger, level) {
+    logWriterBase.prototype.handleLogInput = function (loggerName, level) {
+        var args = [];
+        for (var _i = 2; _i < arguments.length; _i++) {
+            args[_i - 2] = arguments[_i];
+        }
+        // Filter log accordint to config.
+        var minLevel = this.levels[loggerName] || loggingService.defaultLevel;
+        if (level >= minLevel)
+            this.writeLog(loggerName, loggingService.levelToString(level), args);
+    };
+    logWriterBase.prototype.writeLog = function (loggerName, level) {
         var args = [];
         for (var _i = 2; _i < arguments.length; _i++) {
             args[_i - 2] = arguments[_i];
@@ -167,15 +151,18 @@ var consoleLogWriter = (function (_super) {
         this.writeTimeStamp = false;
         this.writeTimeStamp = configuration.timestamp || true;
     }
-    consoleLogWriter.prototype.handleLogInput = function (logger, level) {
+    consoleLogWriter.prototype.writeLog = function (loggerName, level) {
         var args = [];
         for (var _i = 2; _i < arguments.length; _i++) {
             args[_i - 2] = arguments[_i];
         }
-        if (this.writeTimeStamp)
-            console.log.apply(console, [new Date(Date.now()).toISOString(), "\t", level, "\t", logger.name, "\t"].concat(args));
-        else
-            console.log.apply(console, [level, "\t", logger.name, "\t\t"].concat(args));
+        if (this.writeTimeStamp) {
+            var a = args.join(' '); // TODO: FIX since this doesnt work!!!
+            console.log(new Date(Date.now()).toISOString(), "\t", level, "\t", loggerName, "\t", a);
+        }
+        else {
+            console.log.apply(console, [level, "\t", loggerName, "\t\t"].concat(args));
+        }
     };
     return consoleLogWriter;
 }(logWriterBase));

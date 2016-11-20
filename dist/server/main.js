@@ -5,8 +5,10 @@
 var loggingService_1 = require('./loggingService');
 loggingService_1.loggingService.setDefaultLevel("trace");
 loggingService_1.loggingService.addWriter(new loggingService_1.consoleLogWriter({ timestamp: true }));
-var log = loggingService_1.loggingService.getLogger("Main", "trace");
+var log = loggingService_1.loggingService.getLogger("Main");
+log.info("ARI 2.0 Starting.");
 var httpServer_1 = require('./httpServer');
+var wsServer_1 = require('./wsServer');
 var PluginLoader_1 = require('./PluginLoader');
 var AriEventEmitter_1 = require('./AriEventEmitter');
 var ariEvents = AriEventEmitter_1.default.getInstance();
@@ -47,8 +49,8 @@ function handleNormalExit() {
 //*****************************************************************************
 // Start httpServer + websocketServer....
 var http = new httpServer_1.httpServer();
-//var wss = new wsServer(http);
+var wss = new wsServer_1.default(http.server);
 //*****************************************************************************
 // Start plugins
-var pLoader = new PluginLoader_1.default();
+PluginLoader_1.default.start();
 //# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/server/main.js.map

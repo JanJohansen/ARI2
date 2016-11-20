@@ -58,8 +58,8 @@ exports.Graph = Graph;
 var AriComponent = (function () {
     function AriComponent(id) {
         this.metadata = {};
-        this.ins = [];
-        this.outs = [];
+        this.ins = {};
+        this.outs = {};
         this.id = id;
         this.metadata.name = "Unnamed";
     }

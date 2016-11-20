@@ -5,14 +5,15 @@
 import { loggingService, consoleLogWriter } from './loggingService';
 loggingService.setDefaultLevel("trace");
 loggingService.addWriter(new consoleLogWriter({timestamp: true}));
-var log = loggingService.getLogger("Main", "trace");
+var log = loggingService.getLogger("Main");
+log.info("ARI 2.0 Starting.");
 
 import { httpServer } from './httpServer';
 import wsServer from './wsServer';
 import Executor from './nodeExecutor';
 import PluginLoader from './PluginLoader';
 import AriEventEmitter from './AriEventEmitter';
-var ariEvents = AriEventEmitter.getInstance();
+var ariEvents: any = AriEventEmitter.getInstance();
 
 
 
@@ -59,10 +60,10 @@ function handleNormalExit() {
 //*****************************************************************************
 // Start httpServer + websocketServer....
 var http = new httpServer();
-//var wss = new wsServer(http);
+var wss = new wsServer(http.server);
 
 //*****************************************************************************
 // Start plugins
-var pLoader = new PluginLoader();
+PluginLoader.start();
 
 

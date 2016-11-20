@@ -1,45 +1,28 @@
-//import colors from 'colors';
-//import { EventEmitter } from 'events';
 
-//console.log("colors:", colors);
 
- /*
- * loggingService
- */
 export class loggingService {
     static loggers: loggerInstance[] = [];
     static logWriters: logWriterBase[] = [];
     static listeners: Object = {};
-    static defaultLevel = "info";
+    static defaultLevel = 300;
 
 
-        /**
-         * Get a logger thing...
-         */
-    static getLogger(name: string, level?: string): loggerInstance {
+    static getLogger(name: string): loggerInstance {
         if(!this.loggers[name]){
-            if(!level) level = loggingService.defaultLevel;
-            let logger = new loggerInstance(name, level);
+            let logger = new loggerInstance(name);
             this.loggers[name] = logger; 
             return logger;
         } else return this.loggers[name];
     }
 
-    static logInput(logger: loggerInstance, level: number,  ...args){
-        // Filter on loggerInstance level...
-
-        // TODO: Change to use logging level for writers instead of for loggers.!!
-
-        if(level >= logger.level) {
-            this.logWriters.forEach(writer => {
-                writer.handleLogInput(logger, loggingService.levelToString(level), ...args);
+    static logInput(loggerName: string, level: number,  ...args){
+        this.logWriters.forEach(writer => {
+            writer.handleLogInput(loggerName, level, ...args);
+        });
+        if(loggingService.listeners[loggerName]){
+            loggingService.listeners[loggerName].forEach(callback => {
+                callback(loggerName, loggingService.levelToString(level), ...args);
             });
-            if(loggingService.listeners[logger.name]){
-                loggingService.listeners[logger.name].forEach(callback => {
-                    callback(logger, loggingService.levelToString(level), ...args);
-                });
-            }
-            //console.log(loggingService.levelToString(level), "\t", logger.name, "\t", ...args);
         }
     }
 
@@ -70,53 +53,52 @@ export class loggingService {
         loggingService.listeners[loggerName].push(callback);
     }
 
-    static setLevel(loggerName: string, level: string) {
-        let logger = this.getLogger(loggerName, level);
-        logger.setLevel(level);
-    }
-
     static setDefaultLevel(level: string) {
-        loggingService.defaultLevel = level;
+        loggingService.defaultLevel = loggingService.levels[level];
     }
 }
 
 class loggerInstance {
     name: string;
-    level: number;
-    constructor(name: string, level?: string) {
+    constructor(name: string) {
         this.name = name;
-        if(level) this.setLevel(level);
-        else this.setLevel(loggingService.defaultLevel);
     }
-
-    setLevel(level: string) {
-        if(loggingService.levels[level]) this.level = loggingService.levels[level];
-        // else ignore!?
-    }
-    
+   
     trace(...args) {
-        loggingService.logInput(this, loggingService.levels.trace, ...args);
+        loggingService.logInput(this.name, loggingService.levels.trace, ...args);
     }
     debug(...args) {
-        loggingService.logInput(this, loggingService.levels.debug, ...args);
+        loggingService.logInput(this.name, loggingService.levels.debug, ...args);
     }
     info(...args) {
-        loggingService.logInput(this, loggingService.levels.info, ...args);
+        loggingService.logInput(this.name, loggingService.levels.info, ...args);
     }
     warn(...args) {
-        loggingService.logInput(this, loggingService.levels.warn, ...args);
+        loggingService.logInput(this.name, loggingService.levels.warn, ...args);
     }
     error(...args) {
-        loggingService.logInput(this, loggingService.levels.error, ...args);
+        loggingService.logInput(this.name, loggingService.levels.error, ...args);
     }
     fatal(...args) {
-        loggingService.logInput(this, loggingService.levels.fatal, ...args);
+        loggingService.logInput(this.name, loggingService.levels.fatal, ...args);
     }
 }
 
 export class logWriterBase {
-    constructor(configuration: Object = {}){}
-    handleLogInput(logger: loggerInstance, level: string, ...args){
+    config: any;
+    levels = {};    // log level for each incoming loggerinstance.
+
+    constructor(config: Object = {}){
+        this.config = config;
+    }
+
+    handleLogInput(loggerName: string, level: number, ...args){
+        // Filter log accordint to config.
+        var minLevel = this.levels[loggerName] || loggingService.defaultLevel;
+        if(level >= minLevel) this.writeLog(loggerName, loggingService.levelToString(level), args);
+    }
+
+    writeLog(loggerName: string, level: string, ...args){
         console.log("Missing overrride of logWriters handleLogInput method.!");
     }
 }
@@ -129,8 +111,13 @@ export class consoleLogWriter extends logWriterBase {
         this.writeTimeStamp = configuration.timestamp || true;
     }
 
-    handleLogInput(logger, level: string, ...args){
-        if(this.writeTimeStamp) console.log(new Date(Date.now()).toISOString(), "\t", level, "\t", logger.name, "\t", ...args);
-        else console.log(level, "\t", logger.name, "\t\t", ...args);
+    writeLog(loggerName, level: string, ...args){
+        if(this.writeTimeStamp) {
+            var a = args.join(' '); // TODO: FIX since this doesnt work!!!
+            console.log(new Date(Date.now()).toISOString(), "\t", level, "\t", loggerName, "\t", a);
+        }
+        else {
+            console.log(level, "\t", loggerName, "\t\t", ...args);
+        }
     }
 }

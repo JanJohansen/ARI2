@@ -1,46 +1,49 @@
 import { loggingService } from './loggingService';
-import AriEventEmitter from './AriEventEmitter'; 
+import AriEventEmitter from './AriEventEmitter';
 var fs = require("fs");
 var cp = require('child_process');
 
 // Logging instance for Main...
-var log = loggingService.getLogger("PluginLoader", "trace");
-var ariEvents = AriEventEmitter.getInstance();
 
-export default class PluginLoader{
-    pluginsPath = __dirname + "/plugins";
-    pluginInfos: any = {};
-    
-    constructor(){
-        log.debug("Starting PluginLoader.");
-        this.LoadPluginInfo();
-        ariEvents.on("pluginLoader.newPluginInfo",(pluginInfo)=>{
-            log.trace("New plugin detected.");
+export default class PluginLoader {
+    static pluginsPath = __dirname + "/plugins";
+    static pluginInfos: any = {};
+    static ariEvents: any = AriEventEmitter.getInstance();
+    static log = loggingService.getLogger("PluginLoader");
+    static loadLocal = true;    // Set this to load plugins into existing V8 engine instead of spawning a new process.
+
+    private constructor() {}
+
+    static start(){
+        PluginLoader.LoadPluginInfo();
+        PluginLoader.ariEvents.on("pluginLoader.newPluginInfo", (pluginInfo) => {
+            PluginLoader.log.trace("New plugin detected.");
+            // TODO: check if we should actually start the plugin according to user settings. (enabled / disabled!)
             this.LoadPlugin(pluginInfo);
         });
     }
 
-    LoadPluginInfo(){
-        return new Promise((resolve, reject)=>{
+    static LoadPluginInfo() {
+        return new Promise((resolve, reject) => {
             var self = this;
-            fs.readdir(this.pluginsPath, (err, files)=>{
+            fs.readdir(this.pluginsPath, (err, files) => {
                 if (err) { reject(Error("Path to plugins not found.")); }
-            
-                files.forEach((dir)=>{
-                    fs.stat(self.pluginsPath + "/" + dir, (error, stat)=>{
+
+                files.forEach((dir) => {
+                    fs.stat(self.pluginsPath + "/" + dir, (error, stat) => {
                         if (stat && stat.isDirectory()) {
                             // We found sub-dir of plugins dir.
                             // Read manifest.
-                            fs.readFile(self.pluginsPath + "/" + dir + "/" + "package.json", (err, data)=>{
+                            fs.readFile(self.pluginsPath + "/" + dir + "/" + "package.json", (err, data) => {
                                 try { var manifest = JSON.parse(data) } catch (e) { log.warn(e); return; }
                                 if (manifest) {
                                     // Manifest available...
                                     if (manifest.AriPluginInfo) {
                                         manifest.AriPluginInfo.pluginPath = self.pluginsPath + "/" + dir;
-                                        if(!manifest.AriPluginInfo.debugFilePath) manifest.AriPluginInfo.debugFilePath = manifest.AriPluginInfo.pluginPath;
-                                         
+                                        if (!manifest.AriPluginInfo.debugFilePath) manifest.AriPluginInfo.debugFilePath = manifest.AriPluginInfo.pluginPath;
+
                                         self.pluginInfos[dir] = manifest.AriPluginInfo;
-                                        ariEvents.emit("pluginLoader.newPluginInfo", manifest.AriPluginInfo);
+                                        PluginLoader.ariEvents.emit("pluginLoader.newPluginInfo", manifest.AriPluginInfo);
                                     }
                                 }
                             });
@@ -52,35 +55,40 @@ export default class PluginLoader{
         });
     }
 
-    LoadPlugin(plugin){
+    static LoadPlugin(plugin) {
         if (!(plugin.name && plugin.main)) {
-            log.error("Error in configuration file when loading plugin.");
+            PluginLoader.log.error("Error in configuration file when loading plugin.");
             return;
         }
-        log.info("Loading plugin:", plugin.name);
-       
-        // Child will use parent's stdios
-        if (!plugin.arguments) plugin.arguments = "";
-        var args = [plugin.main].concat(plugin.args.split(" "));
+        PluginLoader.log.info("Loading plugin:", plugin.name);
 
-        var pluginProcess = cp.spawn("node", args, { "cwd": plugin.pluginPath });
+        if(PluginLoader.loadLocal){
+            require(plugin.pluginPath + "/" + plugin.main); 
+        } 
+        else 
+        {
+            if (!plugin.arguments) plugin.arguments = "";
+            var args = [plugin.main].concat(plugin.args.split(" "));
 
-        pluginProcess.stdout.on('data', function (data) {
-            console.log("/" + plugin.name + ":", data.toString());
+            var pluginProcess = cp.spawn("node", args, { "cwd": plugin.pluginPath });
+
+            pluginProcess.stdout.on('data', function (data) {
+                console.log("/" + plugin.name + ":", data.toString());
                 plugin.stdout += data.toString();
-        });
+            });
 
-        pluginProcess.stderr.on('data', function (data) {
-            console.log(plugin.name + " ERROR:", data.toString());
+            pluginProcess.stderr.on('data', function (data) {
+                console.log(plugin.name + " ERROR:", data.toString());
                 plugin.errout += data.toString();
-        });
+            });
 
-        pluginProcess.on('close', function (code) {
-            console.log(plugin.name + " exit!:", code.toString());
-            // TODO: Implement restart plugin n times before reporting error?
-            //saveDebug(false);
-        });
+            pluginProcess.on('close', function (code) {
+                console.log(plugin.name + " exit!:", code.toString());
+                // TODO: Implement restart plugin n times before reporting error?
+                //saveDebug(false);
+            });
 
-        ariEvents.emit("pluginLoader.pluginLoaded", plugin.name);
+            PluginLoader.ariEvents.emit("pluginLoader.pluginLoaded", plugin.name);
+        }
     }
 }

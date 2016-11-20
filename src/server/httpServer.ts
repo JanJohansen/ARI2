@@ -1,6 +1,10 @@
 import { loggingService } from './loggingService';
-import express = require('express');
-import path = require('path');
+
+//var WebSocketServer = require('../../').Server;
+var http = require('http');
+var express = require('express');
+var path = require('path');
+var app = express();
 
 var log = loggingService.getLogger("httpServer");
 var app = express();
@@ -9,11 +13,13 @@ var app = express();
  * httpServer
  */
 export class httpServer {
+    server: any;
+
     constructor() {
         var port: number = process.env.PORT || 4000;
-        
+
         app.use(function (req, res, next) {
-            log.info(req.method, req.url);
+            log.trace(req.method, req.url);
             next();
         });
         
@@ -22,7 +28,9 @@ export class httpServer {
         app.use('/node_modules', express.static(path.resolve(__dirname, '../../node_modules')));
 
         log.trace("Starting httpServer..");
-        app.listen(port, function () {
+
+        this.server = http.createServer(app);
+        this.server.listen(port, function () {
             log.info(`Listening on portz ${port}.`);
         });
     } 

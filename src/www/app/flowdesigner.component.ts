@@ -7,7 +7,7 @@ import { Component, ElementRef } from '@angular/core';
     //directives: [ ContextMenuComponent ]
 })
 export class FlowDesignerComponent { 
-    flow = {
+    flow:any = {
         nodes: [
             {name: "Node 1", x: 50, y: 50, width: 200,
                 inputs: [

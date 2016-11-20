@@ -2,20 +2,26 @@
 var EventEmitter2 = require('eventemitter2').EventEmitter2;
 var AriEventEmitter = (function () {
     function AriEventEmitter() {
-        if (AriEventEmitter.EE2)
-            return AriEventEmitter.EE2; // Ensure we stay singleton!
-        AriEventEmitter.EE2 = new EventEmitter2({
+        var emitter = new EventEmitter2({
             wildcard: true,
             delimiter: '.',
             newListener: true,
             maxListeners: 0,
             verboseMemoryLeak: true
         });
-        return AriEventEmitter.EE2; // Ensure we stay singleton!
+        return emitter; // Ensure we stay singleton!
     }
-    AriEventEmitter.getInstance = function () {
-        return new AriEventEmitter();
+    /**
+     * get named instance of event emitter. Call without parameter to get default emitter.
+     */
+    AriEventEmitter.getInstance = function (emitterName) {
+        if (emitterName === void 0) { emitterName = ""; }
+        if (!AriEventEmitter.instances[emitterName])
+            AriEventEmitter.instances[emitterName] = new AriEventEmitter();
+        else
+            return AriEventEmitter.instances[emitterName];
     };
+    AriEventEmitter.instances = {};
     return AriEventEmitter;
 }());
 Object.defineProperty(exports, "__esModule", { value: true });

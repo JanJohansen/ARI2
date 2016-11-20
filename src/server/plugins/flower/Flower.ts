@@ -82,8 +82,8 @@ interface iComponentMetadata {
 
 class AriComponent {
     metadata: iComponentMetadata = {};
-    ins: AriInput[] = [];
-    outs: AriOutput[] = [];
+    ins: any = {};
+    outs: any = {};
     _graph?: Graph;
     id: string;
 

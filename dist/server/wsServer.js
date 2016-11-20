@@ -6,14 +6,15 @@ var ariClientServer_1 = require("./ariClientServer");
 var wsServer = (function () {
     function wsServer(httpServer) {
         log.debug("Starting wsServer...");
-        var wss = new WebSocketServer({ port: 8080 });
-        wss.on('connection', function connection(ws) {
+        var wss = new WebSocketServer({ server: httpServer });
+        wss.on('connection', function (ws) {
             // Client connected
-            log.debug('Client connected:', ws);
+            log.debug('Client connected.');
+            // TODO: Log IP of client... ws.upgradeReq.connection.remoteAddress doesnt work :O()
             // Create ari client and hook up to ws.
             var clientServer = new ariClientServer_1.default();
-            ws.on('message', function incoming(message) {
-                log.debug('Message from", ws.origin, " received: %s', message);
+            ws.on('message', function (message) {
+                log.debug("<-", message);
                 clientServer.handleMessage(message);
             });
             ws.on('close', function () {
@@ -24,8 +25,12 @@ var wsServer = (function () {
                 log.debug("Connection from ", ws.origin, " had error!");
                 clientServer.handleDisconnect();
             });
-            clientServer.on('message', function (message) {
-                ws.send(message);
+            clientServer.on('send', function (message) {
+                if (ws.readyState !== ws.OPEN) {
+                    log.error('ERROR!!! - WS not opened, trying ot send', message);
+                }
+                else
+                    ws.send(message);
             });
             clientServer.on('error', function () {
                 log.debug("Error from clientServer!?");
