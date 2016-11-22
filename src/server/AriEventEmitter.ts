@@ -6,7 +6,7 @@ export default class AriEventEmitter {
         var emitter = new EventEmitter2({
             wildcard: true,
             delimiter: '.', 
-            newListener: true, 
+            newListener: false, 
             maxListeners: 0,
             verboseMemoryLeak: true
         });
@@ -17,6 +17,6 @@ export default class AriEventEmitter {
      */
     static getInstance(emitterName: string = ""): AriEventEmitter{
         if(!AriEventEmitter.instances[emitterName]) AriEventEmitter.instances[emitterName] = new AriEventEmitter();
-        else return AriEventEmitter.instances[emitterName];
+        return AriEventEmitter.instances[emitterName];
     }
 }

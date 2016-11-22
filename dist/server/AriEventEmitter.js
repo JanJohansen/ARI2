@@ -5,7 +5,7 @@ var AriEventEmitter = (function () {
         var emitter = new EventEmitter2({
             wildcard: true,
             delimiter: '.',
-            newListener: true,
+            newListener: false,
             maxListeners: 0,
             verboseMemoryLeak: true
         });
@@ -18,8 +18,7 @@ var AriEventEmitter = (function () {
         if (emitterName === void 0) { emitterName = ""; }
         if (!AriEventEmitter.instances[emitterName])
             AriEventEmitter.instances[emitterName] = new AriEventEmitter();
-        else
-            return AriEventEmitter.instances[emitterName];
+        return AriEventEmitter.instances[emitterName];
     };
     AriEventEmitter.instances = {};
     return AriEventEmitter;

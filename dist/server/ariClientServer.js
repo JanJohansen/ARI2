@@ -6,23 +6,24 @@ var __extends = (this && this.__extends) || function (d, b) {
 };
 var loggingService_1 = require('./loggingService');
 var log = loggingService_1.loggingService.getLogger("ariClientServer");
+var AriEventEmitter_1 = require('./AriEventEmitter');
+var ariEvent = AriEventEmitter_1.default.getInstance();
 var events_1 = require('events');
 var ariClientServer = (function (_super) {
     __extends(ariClientServer, _super);
-    //private _events = {};
-    function ariClientServer() {
+    function ariClientServer(ari) {
         _super.call(this);
-        this.clientModel = {};
         this._nextReqId = 0; // Id to use for identifying requests and corresponding response callbacks.
         this._pendingCallbacks = {}; // Callbacks for pending server requests.
-        this.emit("send", '"{"mcd":"HELLO"}');
+        this.ari = ari;
     }
-    ariClientServer.prototype.handleMessage = function (message) {
+    ariClientServer.prototype.msgIn = function (message) {
         try {
             var msg = JSON.parse(message);
         }
         catch (e) {
-            console.log("Error: Illegal JSON in message! - Ignoring...");
+            log.error("Error: Illegal JSON in message! - Ignoring...");
+            this.emit("closeOut");
             return;
         }
         var self = this;
@@ -30,19 +31,19 @@ var ariClientServer = (function (_super) {
             // Request message.
             var cmd = msg.cmd;
             if (!cmd) {
-                console.log("Error: Missing comand in telegram! - Ignoring...");
+                log.error("Error: Missing comand in telegram! - Ignoring...");
                 return;
             }
             ;
             // Call requested function if it exists.
             if (this["_webcall_" + cmd]) {
-                this["_webcall_" + cmd](msg.cmd, msg.data, function (err, result) {
+                this["_webcall_" + cmd](msg.data, function (err, result) {
                     // reply with results...
                     var res = {};
                     res.res = msg.req;
                     res.err = err;
                     res.result = result;
-                    self.emit("send", JSON.stringify(res));
+                    self.emit("msgOut", JSON.stringify(res));
                 });
             }
             else
@@ -70,7 +71,7 @@ var ariClientServer = (function (_super) {
             }
             ;
             if (this["_webnotify_" + cmd]) {
-                this["_webnotify_" + cmd](msg.cmd, msg.data);
+                this["_webnotify_" + cmd](msg.data);
             }
         }
     };
@@ -83,69 +84,43 @@ var ariClientServer = (function (_super) {
             // if callback is provided, store it to be called when response is received.
             this._pendingCallbacks[msg.req] = callback;
         }
-        this.emit("send", JSON.stringify(msg));
+        this.emit("msgOut", JSON.stringify(msg));
     };
     ariClientServer.prototype.notify = function (cmd, data) {
         var msg = {};
         msg.cmd = cmd;
         msg.data = data;
-        this.emit("send", JSON.stringify(msg));
+        this.emit("msgOut", JSON.stringify(msg));
     };
-    ariClientServer.prototype.handleDisconnect = function () {
+    ariClientServer.prototype.disconnect = function () {
+        this.ari.clientConnected(this.name);
     };
-    ariClientServer.prototype._webcall_REQAUTHTOKEN = function (cmd, pars, callback) {
+    ariClientServer.prototype._webcall_REQAUTHTOKEN = function (pars, callback) {
         //{ "name": this.name, "role": this.role, "password": this.password }
-        callback(null, { "name": pars.name, "authToken": 42 }); // No checks or now.
+        if (pars.password == "please") {
+            //TODO: Ensure name is unique
+            this.name = pars.name;
+            callback(null, { "name": pars.name, "authToken": 42 }); // No checks or now.
+        }
+        else
+            callback("Error: Wrong password.", null);
     };
-    ariClientServer.prototype._webcall_CONNECT = function (cmd, pars, callback) {
+    ariClientServer.prototype._webcall_CONNECT = function (pars, callback) {
         //{ "name": self.name, "authToken":this.authToken }
-        callback(null, { "name": pars.name, "authToken": 42 }); // No checks or now.
+        if (pars.authToken == 42) {
+            // TODO: Use name from authToken since this is registered with ari!
+            this.name = pars.name;
+            callback(null, { "name": pars.name, "authToken": 42 }); // No checks or now.
+            this.ari.clientConnected(this.name);
+        }
+        else
+            callback("Error: AuthToken invalid!", null);
     };
     //-----------------------------------------------------------------------------
     ariClientServer.prototype._webnotify_CLIENTINFO = function (clientInfo) {
-        console.log("_webcall_CLIENTINFO", clientInfo);
-        if (!this.clientModel) {
-            console.log("ERROR trying to call SetClientInfo before calling Connect!");
-            return;
-        }
-        // clientInfo has already been JSON.parsed!
-        // Merge client info with present info... Remove values, functions, etc. not in Info from client.
-        if (clientInfo.values) {
-            for (var key in this.clientModel.values) {
-                if (!clientInfo.values[key]) {
-                    // value removed from clientInfo - remove from clientModel.
-                    delete this.clientModel.values[key];
-                }
-            }
-        }
-        if (clientInfo.functions) {
-            for (var key in this.clientModel.functions) {
-                if (!clientInfo.functions[key]) {
-                    // value removed from clientInfo - remove from clientModel.
-                    delete this.clientModel.functions[key];
-                }
-            }
-        }
-        // Perform deep merge from remote clientInfo to local clientModel.
-        this.deepMerge(clientInfo, this.clientModel);
-        // Make sure name is the one used in token!. (E.g. given name from server and not the default name from client.)
-        //this.clientModel.name = this.name;
-        // HACK FOR NOW!
-        this.clientModel.name = clientInfo.name;
+        log.trace("_webcall_CLIENTINFO", clientInfo);
+        this.ari.setClientInfo(this.name, clientInfo);
     };
-    ariClientServer.prototype.deepMerge = function (source, destination) {
-        for (var property in source) {
-            if (typeof source[property] === "object" && source[property] !== null) {
-                destination[property] = destination[property] || {};
-                this.deepMerge(source[property], destination[property]);
-            }
-            else {
-                destination[property] = source[property];
-            }
-        }
-        return destination;
-    };
-    ;
     return ariClientServer;
 }(events_1.EventEmitter));
 Object.defineProperty(exports, "__esModule", { value: true });

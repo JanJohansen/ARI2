@@ -2,9 +2,10 @@
 var ariclient_1 = require("../../../www/app/ariclient");
 //var state = new StateStore();
 //var ari = new AriClient({authToken: state.authToken});
-var ari = new ariclient_1.default();
+var ari = new ariclient_1.default("Flower_plugin", { password: "please" });
+console.log("Registering callbacks on FlowerPlugin");
 ari.on("connect", function () {
-    ari.log("FlowerPlugin", "Flower plugin started and connected.");
+    console.log("FlowerPlugin", "Flower plugin started and connected.");
     // Define IOs
     var out1 = ari.addOutput({ name: "out1" });
     ari.addInput({ name: "in1" }, function (data) {

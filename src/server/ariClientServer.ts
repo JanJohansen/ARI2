@@ -1,40 +1,47 @@
 import { loggingService, consoleLogWriter } from './loggingService';
 var log = loggingService.getLogger("ariClientServer");
+import AriEventEmitter from './AriEventEmitter';
+var ariEvent: any = AriEventEmitter.getInstance();
 
 import {EventEmitter} from 'events';
+import Ari from './ari';
 
 
 export default class ariClientServer extends EventEmitter {
 
-    private clientModel: any = {}; 
+    private ari: Ari;
+    private name;
     private _nextReqId = 0;        // Id to use for identifying requests and corresponding response callbacks.
     private _pendingCallbacks = {};// Callbacks for pending server requests.
-    //private _events = {};
 
-    constructor() {
+    constructor(ari) {
         super();
-        this.emit("send", '"{"mcd":"HELLO"}');
+        this.ari = ari;
     }
 
-    handleMessage(message: string) {
+    msgIn(message: string) {
         try { var msg = JSON.parse(message); }
-        catch (e) { console.log("Error: Illegal JSON in message! - Ignoring..."); return; }
-        
+        catch (e) { 
+            log.error("Error: Illegal JSON in message! - Ignoring...");
+            this.emit("closeOut");
+            return; 
+        }
+
         var self = this;
         if ("req" in msg) {
             // Request message.
             var cmd = msg.cmd;
-            if (!cmd) { console.log("Error: Missing comand in telegram! - Ignoring..."); return; };
+            if (!cmd) { log.error("Error: Missing comand in telegram! - Ignoring..."); return; };
 
             // Call requested function if it exists.
             if(this["_webcall_"+cmd]) {
-                this["_webcall_"+cmd](msg.cmd, msg.data, function (err, result) {
+                this["_webcall_"+cmd](msg.data, function (err, result) {
                     // reply with results...
                     var res: any = {};
                     res.res = msg.req;
                     res.err = err;
                     res.result = result;
-                    self.emit("send", JSON.stringify(res));
+                    self.emit("msgOut", JSON.stringify(res));
                 });
             } else log.error("Handler for ariProtocol message", cmd, "not implemented!");
         } else if ("res" in msg) {
@@ -47,7 +54,7 @@ export default class ariClientServer extends EventEmitter {
                 //try {
                     callback(msg.err, msg.result);
                 /*} catch (e) {
-                    console.log("Uncaught exception in callback for _call!", e);
+                    log.fatal("Uncaught exception in callback for _call!", e);
                 }*/
             } else {
                 // No callback provided...
@@ -57,7 +64,7 @@ export default class ariClientServer extends EventEmitter {
             var cmd = msg.cmd;
             if (!cmd) { log.error("Error: Missing comand in telegram! - Ignoring..."); return; };
             if(this["_webnotify_"+cmd]) {
-                this["_webnotify_"+cmd](msg.cmd, msg.data);
+                this["_webnotify_"+cmd](msg.data);
             }
         }
     }
@@ -71,77 +78,47 @@ export default class ariClientServer extends EventEmitter {
             // if callback is provided, store it to be called when response is received.
             this._pendingCallbacks[msg.req] = callback;
         }
-        this.emit("send", JSON.stringify(msg));
+        this.emit("msgOut", JSON.stringify(msg));
     }
 
     private notify(cmd: string, data: any) {
         var msg: any = {};
         msg.cmd = cmd;
         msg.data = data;
-        this.emit("send", JSON.stringify(msg));
+        this.emit("msgOut", JSON.stringify(msg));
     }
 
-    handleDisconnect() {
-
+    disconnect() {
+        this.ari.clientConnected(this.name);
     }
 
-    _webcall_REQAUTHTOKEN(cmd, pars, callback){
+    _webcall_REQAUTHTOKEN(pars, callback){
         //{ "name": this.name, "role": this.role, "password": this.password }
-        callback(null, { "name": pars.name, "authToken": 42 }); // No checks or now.
+        if(pars.password == "please") {
+            
+            //TODO: Ensure name is unique
+            this.name = pars.name;
+            callback(null, { "name": pars.name, "authToken": 42 }); // No checks or now.
+        }
+        else callback("Error: Wrong password.", null);
     }
     
-    _webcall_CONNECT(cmd, pars, callback){
+    _webcall_CONNECT(pars, callback){
         //{ "name": self.name, "authToken":this.authToken }
-        callback(null, { "name": pars.name, "authToken": 42 }); // No checks or now.
+        if(pars.authToken == 42) {
+            // TODO: Use name from authToken since this is registered with ari!
+            this.name = pars.name;
+            callback(null, { "name": pars.name, "authToken": 42 }); // No checks or now.
+            this.ari.clientConnected(this.name);
+        }
+        else callback("Error: AuthToken invalid!", null);
     }
 
     //-----------------------------------------------------------------------------
     _webnotify_CLIENTINFO(clientInfo) {
-        console.log("_webcall_CLIENTINFO", clientInfo);
+        log.trace("_webcall_CLIENTINFO", clientInfo);
 
-        if (!this.clientModel) {
-            console.log("ERROR trying to call SetClientInfo before calling Connect!");
-            return;
-        }
-
-        // clientInfo has already been JSON.parsed!
-
-        // Merge client info with present info... Remove values, functions, etc. not in Info from client.
-        if (clientInfo.values) {
-            for (var key in this.clientModel.values) {
-                if (!clientInfo.values[key]) {
-                    // value removed from clientInfo - remove from clientModel.
-                    delete this.clientModel.values[key];
-                }
-            }
-        }
-        if (clientInfo.functions) {
-            for (var key in this.clientModel.functions) {
-                if (!clientInfo.functions[key]) {
-                    // value removed from clientInfo - remove from clientModel.
-                    delete this.clientModel.functions[key];
-                }
-            }
-        }
-        // Perform deep merge from remote clientInfo to local clientModel.
-        this.deepMerge(clientInfo, this.clientModel);
-
-        // Make sure name is the one used in token!. (E.g. given name from server and not the default name from client.)
-        //this.clientModel.name = this.name;
-        // HACK FOR NOW!
-        this.clientModel.name = clientInfo.name;
-
+        this.ari.setClientInfo(this.name, clientInfo);
     }
 
-    deepMerge(source, destination) {
-        for (var property in source) {
-            if (typeof source[property] === "object" && source[property] !== null) {
-                destination[property] = destination[property] || {};
-                this.deepMerge(source[property], destination[property]);
-            } else {
-                destination[property] = source[property];
-            }
-        }
-        return destination;
-    };
 }

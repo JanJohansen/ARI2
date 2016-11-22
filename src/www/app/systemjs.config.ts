@@ -2,6 +2,8 @@
  * System configuration for Angular samples
  * Adjust as necessary for your application needs.
  */
+declare var System: any;
+
 (function (global) {
   System.config({
     transpiler: 'typescript',

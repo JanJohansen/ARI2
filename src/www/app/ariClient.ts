@@ -7,7 +7,8 @@ export default class AriClient {
     name: string;
     password: string;
     options: any;
-    event: string;
+    eventName: string;
+    isConnected: boolean = false;
     clientModel: any = {ins: {}, outs: {}, functions: {}, _outWatches: {}};
     
     private _nextReqId = 0;        // Id to use for identifying requests and corresponding response callbacks.
@@ -23,16 +24,19 @@ export default class AriClient {
      * Create NEW instance of AriClient.
      * If you want to use AriClient as a singletone use the "getInstance" static member.
      */
-    constructor(options: any = {}){
+    constructor(name: string, options: any = {}){
+        //console.log("AriClient: Constructing...");
+        this.clientModel.name = name;
         this.options = options;
         this.connectSocket();
     }
 
+/*    
     static getInstance(...args){
         if(!AriClient._instance) AriClient._instance = new AriClient(args);
         return AriClient._instance;
     }
-
+*/
     on(event: string, callback: (event: string, ...args: any[])=>void){
         if(!this._events[event]) this._events[event] = [];
         this._events[event].push(callback);
@@ -47,13 +51,13 @@ export default class AriClient {
     }
 
     private emit(event: string, ...args: any[]){
-        if(!this._events[event]) {
-            this.event = event; // The receivers can use this.event to get the event name!
+        if(this._events[event]) {
+            this.eventName = event; // The receivers can use this.event to get the event name!
             for(let i in this._events[event])
             {
                 this._events[event][i](args);
             }
-            delete this.event;
+            delete this.eventName;
         }
     }
 
@@ -79,15 +83,18 @@ export default class AriClient {
         }        
         // Open socket!
         if (!this._ws) {
-            //console.log("Creating WSocket!");
+            //console.log("AriClient: Opening websocket -", this.options.wsUrl);
             this._ws = new WebSocket(this.options.wsUrl);
+            
         
             this._ws.onopen = () => {
+                //console.log("AriClient: websocket connected.");
                 this.connectAri();
             }
 
             this._ws.onmessage = (message) => {
-                this.handleSocketMessage(message);
+                //console.log("AriClient.wsMsg:", message.data);
+                this.handleSocketMessage(message.data);
             };
 
             this._ws.onerror = () => {
@@ -121,8 +128,10 @@ export default class AriClient {
             console.log("Storing message until connected...");
             this._pendingMsgs.push(msg);
         }
-        else this._ws.send(msg);
-        console.log("->", msg);
+        else {
+            //console.log("AriClient: Sending msg:", msg);
+            this._ws.send(msg);
+        }
     }
 
     //*************************************************************************
@@ -130,7 +139,7 @@ export default class AriClient {
     //*************************************************************************
     private handleSocketMessage(message: string) {
         try { var msg = JSON.parse(message); }
-        catch (e) { console.log("Error: Illegal JSON in message! - Ignoring..."); return; }
+        catch (e) { console.log("Error: Illegal JSON in message! - Ignoring:", message); return; }
         
         var self = this;
         if ("req" in msg) {
@@ -139,7 +148,7 @@ export default class AriClient {
             if (!cmd) { console.log("Error: Missing comand in telegram! - Ignoring..."); return; };
             if (this._events[cmd]) {
                 // Requested function name is registere for callback. Call it...
-                this["_webcall_"+cmd](msg.cmd, msg.data, function (err, result) {
+                this["_webcall_"+cmd](msg.data, function (err, result) {
                     // reply with results...
                     var res: any = {};
                     res.res = msg.req;
@@ -167,7 +176,7 @@ export default class AriClient {
             // Notofication message.
             var cmd = msg.cmd;
             if (!cmd) { console.log("Error: Missing comand in telegram! - Ignoring..."); return; };
-            this["_webnotify_"+cmd](msg.cmd, msg.data);
+            this["_webnotify_"+cmd](msg.data);
         }
     }
 
@@ -200,9 +209,9 @@ export default class AriClient {
     private connectAri() {
         if (!this.options.authToken) {
             // No authToken, so we need to request it.
-            this.call("REQAUTHTOKEN", { "name": this.name, "role": this.role, "password": this.password }, (err, result) => {
+            this.call("REQAUTHTOKEN", { "name": this.clientModel.name, "role": this.options.role, "password": this.options.password }, (err, result) => {
                 if (err) { console.log("Error:", err); return; }
-                this.name = result.name;
+                this.clientModel.name = result.name;
                 this.options.authToken = result.authToken;
 
                 // Try to connect again.
@@ -212,13 +221,14 @@ export default class AriClient {
             });
         } else {
             // We have authToken, so connect "normally".
-            this.call("CONNECT", { "name": self.name, "authToken":this.authToken }, function (err, result) {
+            this.call("CONNECT", { "name": this.clientModel.name, "authToken": this.options.authToken }, (err, result) => {
                 if (err) {
                     return;
                 }
-
+                console.log("Connect OK!");
+                
                 //console.log("registerClient result:", result);
-                this.name = result.name;
+                this.clientModel.name = result.name;
 
                 // Send if we have stored msg's...
                 for (var i = 0; i < this._pendingMsgs.length; i++) {
@@ -286,15 +296,29 @@ export default class AriClient {
 
     // For easier update, call this and re-register all again.
     clearInputs = function () {
-        this.clientModel.inputs = {};
+        this.clientModel.ins = {};
         this.sendClientInfo();
+    }
+
+    // Remote client wants to set a local input.
+    _webnotify_INPUT(msg) {
+        var name = msg.name;
+        var value = msg.value;
+        if (name == undefined || value == undefined) return;
+
+        //console.log("SETVALUE:", name, "=", value);
+
+        var inp = this.clientModel.ins[name];
+        if (inp) {
+            if(inp._callback) inp._callback(name, value)
+        }
     }
 
 
     //*************************************************************************
     // Outputs
     addOutput(metadata: any){
-        this.clientModel.ins[metadata.name] = metadata;
+        this.clientModel.outs[metadata.name] = metadata;
         this.sendClientInfo();
         var self=this;
         return {send: (data)=>{self.sendOutput(metadata.name, data)}};
@@ -312,15 +336,26 @@ export default class AriClient {
         this.sendClientInfo();
     }
 
-    sendOutput(name: string, data: any){
+    private sendOutput(name: string, data: any){
         this.notify("OUTPUT", {name: name, data: data});
     }
 
     // For easier update, call this and re-register all again.
     private clearOutputs = function () {
-        this.clientModel.outputs = {};
+        this.clientModel.outs = {};
         this.sendClientInfo();
     }
+
+    // Server wants to watch an output.
+    private _webcall_WATCHOUTPUT(msg){
+        this.clientModel._outWatches[msg.name] = {}; 
+    }
+
+    // Server wants to watch an output.
+    private _webcall_UNWATCHOUTPUT(msg){
+        this.clientModel._outWatches[msg.name] = {}; 
+    }
+
 
     //*************************************************************************
     // Remote outputs
@@ -355,12 +390,12 @@ export default class AriClient {
         }
         if (!this.clientModel._outWatches[name]) {
             // If no other local watches on output, unwatch on server.
-            this.notify("UNWATCHVALUE", { "name": name });
+            this.notify("UNWATCHOUTPUT", { "name": name });
         }
     }
 
     // Server informs that a watched output changed.
-    _webcall_OUTPUT(msg){
+    private _webcall_OUTPUT(msg){
         var name = msg.name;
         if (!name) return;
 
@@ -396,20 +431,6 @@ export default class AriClient {
         this.notify("SETINPUT", { "name": name, "value": value });
     }
 
-    // Remote client wants to set a local value.
-    _webnotify_SETINPUT(msg) {
-        var name = msg.name;
-        var value = msg.value;
-        if (name == undefined || value == undefined) return;
-
-        //console.log("SETVALUE:", name, "=", value);
-
-        var v = this.clientModel.values[name];
-        if (v) {
-            if(v._callback) v._callback(name, value)
-        }
-    }
-    
 
     //*************************************************************************
     // Functions
@@ -428,7 +449,7 @@ export default class AriClient {
     };
 
     // Server calls function on this client...
-    _webcall_CALLFUNCTION(msg, callback) {
+    private _webcall_CALLFUNCTION(msg, callback) {
         var rpcName = msg.name;
         if (!rpcName) {
             console.log("Error: Missing name of RPC to call! - Ignoring...");

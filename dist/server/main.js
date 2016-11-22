@@ -8,13 +8,17 @@ loggingService_1.loggingService.addWriter(new loggingService_1.consoleLogWriter(
 var log = loggingService_1.loggingService.getLogger("Main");
 log.info("ARI 2.0 Starting.");
 var httpServer_1 = require('./httpServer');
-var wsServer_1 = require('./wsServer');
+//import wsServer from './wsServer';
+//import Executor from './nodeExecutor';
 var PluginLoader_1 = require('./PluginLoader');
+var ari_1 = require('./ari');
+var ariClientServer_1 = require('./ariClientServer');
 var AriEventEmitter_1 = require('./AriEventEmitter');
 var ariEvents = AriEventEmitter_1.default.getInstance();
+var WebSocketServer = require('ws').Server;
 //*****************************************************************************
 ariEvents.onAny(function (event, args) {
-    log.trace("ariEvent:", event); //, args);
+    log.trace("!!", event); //, args);
 });
 // Log uncaught exceptions.
 process.on('uncaughtException', function (error) {
@@ -49,7 +53,25 @@ function handleNormalExit() {
 //*****************************************************************************
 // Start httpServer + websocketServer....
 var http = new httpServer_1.httpServer();
-var wss = new wsServer_1.default(http.server);
+var wss = new WebSocketServer({ server: http.server });
+var ari = new ari_1.default();
+// Set up "mediator" between components.
+wss.on("connection", function (ws) {
+    log.trace("Client connecting");
+    var acs = new ariClientServer_1.default(ari);
+    ws.on("message", function (msg) {
+        log.trace("<-", msg);
+        acs.msgIn(msg);
+    });
+    acs.on("msgOut", function (tlg) {
+        log.trace("->", tlg);
+        ws.send(tlg);
+    });
+    acs.on("closeOut", function (tlg) { ws.close(); });
+    ws.on("error", function () { acs.disconnect(); });
+    ws.on("close", function () { acs.disconnect(); });
+    // Will acs leak memmory after disconnection?
+});
 //*****************************************************************************
 // Start plugins
 PluginLoader_1.default.start();

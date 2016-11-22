@@ -6,10 +6,12 @@ import * as Flower from './Flower';
 
 //var state = new StateStore();
 //var ari = new AriClient({authToken: state.authToken});
-var ari = new AriClient();
+
+var ari = new AriClient("Flower_plugin", {password: "please"});
+console.log("Registering callbacks on FlowerPlugin");
 ari.on("connect", ()=>{
 
-    ari.log("FlowerPlugin", "Flower plugin started and connected.");
+    console.log("FlowerPlugin", "Flower plugin started and connected.");
 
     // Define IOs
     var out1 = ari.addOutput({name: "out1"});

@@ -30,7 +30,7 @@ export class httpServer {
         log.trace("Starting httpServer..");
 
         this.server = http.createServer(app);
-        this.server.listen(port, function () {
+        this.server.listen(port, ()=>{
             log.info(`Listening on portz ${port}.`);
         });
     } 
