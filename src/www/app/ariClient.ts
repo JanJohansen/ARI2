@@ -300,6 +300,11 @@ export default class AriClient {
         this.sendClientInfo();
     }
 
+    // Set remote input.
+    setInput(name, value) {
+        this.notify("SETINPUT", { "name": name, "value": value });
+    }
+
     // Remote client wants to set a local input.
     _webnotify_INPUT(msg) {
         var name = msg.name;
@@ -336,29 +341,37 @@ export default class AriClient {
         this.sendClientInfo();
     }
 
-    private sendOutput(name: string, data: any){
-        this.notify("OUTPUT", {name: name, data: data});
-    }
-
     // For easier update, call this and re-register all again.
     private clearOutputs = function () {
         this.clientModel.outs = {};
         this.sendClientInfo();
     }
 
-    // Server wants to watch an output.
-    private _webcall_WATCHOUTPUT(msg){
-        this.clientModel._outWatches[msg.name] = {}; 
+
+    private sendOutput(name: string, data: any){
+        this.notify("OUTPUT", {name: name, data: data});
     }
 
-    // Server wants to watch an output.
-    private _webcall_UNWATCHOUTPUT(msg){
-        this.clientModel._outWatches[msg.name] = {}; 
+    // Server informs that a watched output changed.
+    private _webcall_OUTPUT(msg){
+        var name = msg.name;
+        if (!name) return;
+
+        //console.log("VALUE:", name, "=", msg.value);
+
+        // Call all registered callbacks for watched values.
+        // Allow * watches!
+        var watch: any;
+        for (watch in this.clientModel._outWatches) {
+            if (this._matches(watch, name)) {
+                watch = this.clientModel._outWatches[watch];
+                for (var i in watch) {
+                    watch[i](name, msg.data);
+                }
+            }
+        }
     }
 
-
-    //*************************************************************************
-    // Remote outputs
 
     /**
      * Watch remote client output - call function when output changes is notified.
@@ -373,6 +386,12 @@ export default class AriClient {
         this.clientModel._outWatches[name].push(callback);
         return callback;
     }
+
+    // Server wants to watch an output.
+    private _webcall_WATCHOUTPUT(msg){
+        this.clientModel._outWatches[msg.name] = {}; 
+    }
+
 
     /**
      * Provide original callback in case you have more than one callback per watch. 
@@ -394,41 +413,9 @@ export default class AriClient {
         }
     }
 
-    // Server informs that a watched output changed.
-    private _webcall_OUTPUT(msg){
-        var name = msg.name;
-        if (!name) return;
-
-        //console.log("VALUE:", name, "=", msg.value);
-
-        // Call all registered callbacks for watched values.
-        // Allow * watches!
-        var watch: any;
-        for (watch in this.clientModel._outWatches) {
-            if (this._matches(watch, name)) {
-                watch = this.clientModel._outWatches[watch];
-                for (var i in watch) {
-                    watch[i](name, msg.value);
-                }
-            }
-        }
-    }
-
-    // Get latest reported value from server.
-    /*
-    getOutputCache(name, callback) {
-        this._call("GETVALUE", { "name": name }, function (err, result) {
-            callback(err, result);
-        });
-    }
-    */
-
-    //*************************************************************************
-    // Remote inputs
-
-    // Set remote values.
-    setInput(name, value) {
-        this.notify("SETINPUT", { "name": name, "value": value });
+    // Server wants to watch an output.
+    private _webcall_UNWATCHOUTPUT(msg){
+        this.clientModel._outWatches[msg.name] = {}; 
     }
 
 
@@ -443,13 +430,13 @@ export default class AriClient {
 
     // Call function on remote client...
     callFunction(functionName, params, callback: (err: string, result: any)=>void) {
-        this.call("CALLFUNCTION", { "name": functionName, "params": params }, function (err, result) {
+        this.call("CALL", { "name": functionName, "params": params }, function (err, result) {
             callback(err, result);
         });
     };
 
     // Server calls function on this client...
-    private _webcall_CALLFUNCTION(msg, callback) {
+    private _webcall_CALL(msg, callback) {
         var rpcName = msg.name;
         if (!rpcName) {
             console.log("Error: Missing name of RPC to call! - Ignoring...");

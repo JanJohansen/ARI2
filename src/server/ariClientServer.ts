@@ -1,22 +1,58 @@
 import { loggingService, consoleLogWriter } from './loggingService';
 var log = loggingService.getLogger("ariClientServer");
 import AriEventEmitter from './AriEventEmitter';
-var ariEvent: any = AriEventEmitter.getInstance();
+var ariEvent = AriEventEmitter.getInstance();
+
+
 
 import {EventEmitter} from 'events';
-import Ari from './ari';
+
+interface iIn {
+    name: string;
+    description?: string;
+}
+interface iOut {
+    name: string;
+    alias?: string;
+    description?: string;
+    data?: any;
+    updated?: any;
+}
+interface iFunction {
+}
+interface iClient {
+    name: string;
+    description?: string;
+    connected: boolean;
+    pendingAuthentication?: boolean;
+    __clientServer?: AriClientServer;
+    ins?: iIn[];
+    outs?: iOut[];
+    functions?: iFunction[];
+    _outputWatches?: number[];
+}
+interface iUser{
+    name: string;
+}
+interface ariRoot {
+  clients: iClient[];
+  users: iUser[]; 
+}
 
 
-export default class ariClientServer extends EventEmitter {
+export default class AriClientServer extends EventEmitter {
 
-    private ari: Ari;
+    static ari: ariRoot = {clients: {}, users: {}};
+    private static aliases: string[] = [];
+    private ari: ariRoot;
     private name;
     private _nextReqId = 0;        // Id to use for identifying requests and corresponding response callbacks.
     private _pendingCallbacks = {};// Callbacks for pending server requests.
 
-    constructor(ari) {
+
+    constructor() {
         super();
-        this.ari = ari;
+        this.ari = AriClientServer.ari;
     }
 
     msgIn(message: string) {
@@ -69,6 +105,7 @@ export default class ariClientServer extends EventEmitter {
         }
     }
 
+    // Call command on client.
     private call(cmd: string, data: any, callback: (err, result) => void) {
         var msg: any = {};
         msg.req = this._nextReqId++;
@@ -80,7 +117,8 @@ export default class ariClientServer extends EventEmitter {
         }
         this.emit("msgOut", JSON.stringify(msg));
     }
-
+    
+    // Notify client.
     private notify(cmd: string, data: any) {
         var msg: any = {};
         msg.cmd = cmd;
@@ -89,9 +127,14 @@ export default class ariClientServer extends EventEmitter {
     }
 
     disconnect() {
-        this.ari.clientConnected(this.name);
+        //IDEA!
+        this.emit(this.name+".disconnected", true);
+        this.ari.clients[this.name].connected = false;
+        delete this.ari.clients[this.name].__clientServer;
     }
 
+    //*************************************************************************
+    //
     _webcall_REQAUTHTOKEN(pars, callback){
         //{ "name": this.name, "role": this.role, "password": this.password }
         if(pars.password == "please") {
@@ -108,17 +151,204 @@ export default class ariClientServer extends EventEmitter {
         if(pars.authToken == 42) {
             // TODO: Use name from authToken since this is registered with ari!
             this.name = pars.name;
+
+            if(!this.ari.clients[this.name]){
+                this.ari.clients[this.name] = {name: this.name, connected: true, pendingAuthentication: true};
+            }
+            this.ari.clients[this.name].connected = true;
+            this.ari.clients[this.name].__clientServer = this;
+            
             callback(null, { "name": pars.name, "authToken": 42 }); // No checks or now.
-            this.ari.clientConnected(this.name);
+            
         }
         else callback("Error: AuthToken invalid!", null);
     }
 
-    //-----------------------------------------------------------------------------
+    //*************************************************************************
+    //
     _webnotify_CLIENTINFO(clientInfo) {
         log.trace("_webcall_CLIENTINFO", clientInfo);
 
-        this.ari.setClientInfo(this.name, clientInfo);
+//        log.debug("New clientInfo from", clientName, ":", JSON.stringify(clientInfo, null, "\t"));
+        
+        // Merge client info with present info... Remove values, functions, etc. not in Info from client.
+        var clientModel = this.ari.clients[this.name];
+
+        this.deleteRemoved(clientModel, clientInfo, "ins");
+        this.deleteRemoved(clientModel, clientInfo, "outs");
+        this.deleteRemoved(clientModel, clientInfo, "functions");
+
+        // Perform deep merge from remote clientInfo to local clientModel.
+        this.deepMerge(clientInfo, clientModel);
+
+        // Make sure name is the one used in token!. (E.g. given name from server and not the default name from client.)
+        clientModel.name = this.name;
     }
 
+    // Delete members of obj.prop that are not in newObj.prop.
+    // E.g. Delete clientModel.ins.something that are not in clienInfo.ins.something 
+    private deleteRemoved(obj, newObj, prop){
+        if (newObj[prop]) {
+            for (var key in obj[prop]) {
+                if (!newObj[prop][key]) {
+                    // value removed from clientInfo - remove from clientModel.
+                    delete obj[prop][key];
+                }
+            }
+        } else delete obj[prop].ins;
+    }
+
+    private deepMerge(source, destination) {
+        for (var property in source) {
+            if (typeof source[property] === "object" && source[property] !== null) {
+                destination[property] = destination[property] || {};
+                this.deepMerge(source[property], destination[property]);
+            } else {
+                destination[property] = source[property];
+            }
+        }
+        return destination;
+    };
+
+    getAlias(alias: string){
+
+        return "";
+    }
+
+    //*************************************************************************
+    // Inputs
+    _webnotify_SETINPUT(args) {
+        var name = args.name;
+        var value = args.value;
+
+        var clientName = name.split(".")[0];
+        var clientModel = this.ari.clients[clientName];
+        if (clientModel) {
+            var cs: AriClientServer = clientModel.__clientServer;
+            if (cs) {
+                // Remove client name and notify setValue...
+                name = name.substring(name.indexOf(".") + 1);
+                args.name = name;
+                cs.notify("SETINPUT", args);
+            }
+        }
+        // TODO: else check if alias
+    }
+
+    //*************************************************************************
+    // Outputs
+    _webnotify_WATCHOUTPUT(args){
+        var name = args.name;
+        
+        var clientName = name.split(".")[0];
+        var clientModel = this.ari.clients[clientName];
+        if (clientModel) {
+            if(!clientModel._outputWatches[name]) clientModel._outputWatches[name] = 0;
+            clientModel._outputWatches[name] += 1;
+
+            ariEvent.on("out." + name, ({data: data, name: name})=>{
+                name = name.substring(name.indexOf(".") + 1);
+                args.name = name;
+                args.data = data;
+                cs.notify("OUTPUT", args);
+            });
+
+            var cs: AriClientServer = clientModel.__clientServer;
+            if (cs) {
+                name = name.substring(name.indexOf(".") + 1);
+                args.name = name;
+                cs.notify("WATCHOUTPUT", args);
+            }
+        }
+    }
+
+    _webnotify_UNWATCHOUTPUT(args){
+        var name = args.name;
+        
+        var clientName = name.split(".")[0];
+        var clientModel = this.ari.clients[clientName];
+        if (clientModel) {
+            clientModel._outputWatches[name] -= 1;
+            if(clientModel._outputWatches[name] == 0) delete clientModel._outputWatches[name];
+
+            var cs: AriClientServer = clientModel.__clientServer;
+            if (cs) {
+                name = name.substring(name.indexOf(".") + 1);
+                args.name = name;
+                cs.notify("UNWATCHOUTPUT", args);
+            }
+        }
+    }
+
+    _webnotify_OUTPUT(args){
+        var name = args.name;
+        var data = args.data;
+
+        // Convert possible alias.
+        name = this.resolveAlias(name);
+
+        var clientName = name.split(".")[0];
+        var clientModel = this.ari.clients[clientName];
+        if (clientModel) {
+            // Store last value and time of update.
+            if (clientModel.outs) {
+                var clientValueName = name.substring(name.indexOf(".") + 1);
+                var clientValue = clientModel.outs[clientValueName];
+                if (clientValue) {
+                    clientValue.data = data;
+                    clientValue.updated = new Date().toISOString();
+                }
+            }
+                        
+            // Notify listeners about change of output.
+            ariEvent.emit("out."+name, {name: name, data: data});
+        }
+    }
+
+    // Find alias. Return name for alias if found. Return same name if not found.
+    resolveAlias(alias) {
+        return AriClientServer.aliases[alias] || alias;
+    }
+
+    findOutputByName(name) {
+        var clientName = name.split(".")[0];
+        
+        // Find client.
+        var client = this.clientModels[clientName];
+        if (client) {
+            var clientValueName = name.substring(name.indexOf(".") + 1);
+            if (client.values) return client.values[clientValueName];
+        }
+        return undefined;
+    }
+
+    /*****************************************************************************/
+    // Match possible wildcarded strA to strB.
+    private matches(strA, strB)
+    {
+        if (strA == strB) return true;
+        var aPos = strA.indexOf('*');
+        if (aPos >= 0) {
+            var aStr = strA.substring(0, aPos);
+            if (aStr == strB.substring(0, aPos)) return true;
+        }
+        return false;
+    }
+    
+    //*************************************************************************
+    // Funcitions
+    _webcall_CALL(args, callback){
+        var name = args.name;
+        var params = args.params;
+
+        var clientName = name.split(".")[0];
+        var clientModel = this.ari.clients[clientName];
+        if (clientModel) {
+            var cs: AriClientServer = clientModel.__clientServer;
+            if (cs) {
+                name = name.substring(name.indexOf(".") + 1);
+                cs.call(name, params, callback);
+            }
+        }
+    }
 }

@@ -11,7 +11,6 @@ var httpServer_1 = require('./httpServer');
 //import wsServer from './wsServer';
 //import Executor from './nodeExecutor';
 var PluginLoader_1 = require('./PluginLoader');
-var ari_1 = require('./ari');
 var ariClientServer_1 = require('./ariClientServer');
 var AriEventEmitter_1 = require('./AriEventEmitter');
 var ariEvents = AriEventEmitter_1.default.getInstance();
@@ -54,11 +53,10 @@ function handleNormalExit() {
 // Start httpServer + websocketServer....
 var http = new httpServer_1.httpServer();
 var wss = new WebSocketServer({ server: http.server });
-var ari = new ari_1.default();
 // Set up "mediator" between components.
 wss.on("connection", function (ws) {
     log.trace("Client connecting");
-    var acs = new ariClientServer_1.default(ari);
+    var acs = new ariClientServer_1.default();
     ws.on("message", function (msg) {
         log.trace("<-", msg);
         acs.msgIn(msg);

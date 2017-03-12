@@ -297,6 +297,10 @@ var AriClient = (function () {
         delete this.clientModel.ins[name];
         this.sendClientInfo();
     };
+    // Set remote input.
+    AriClient.prototype.setInput = function (name, value) {
+        this.notify("SETINPUT", { "name": name, "value": value });
+    };
     // Remote client wants to set a local input.
     AriClient.prototype._webnotify_INPUT = function (msg) {
         var name = msg.name;
@@ -334,16 +338,24 @@ var AriClient = (function () {
     AriClient.prototype.sendOutput = function (name, data) {
         this.notify("OUTPUT", { name: name, data: data });
     };
-    // Server wants to watch an output.
-    AriClient.prototype._webcall_WATCHOUTPUT = function (msg) {
-        this.clientModel._outWatches[msg.name] = {};
+    // Server informs that a watched output changed.
+    AriClient.prototype._webcall_OUTPUT = function (msg) {
+        var name = msg.name;
+        if (!name)
+            return;
+        //console.log("VALUE:", name, "=", msg.value);
+        // Call all registered callbacks for watched values.
+        // Allow * watches!
+        var watch;
+        for (watch in this.clientModel._outWatches) {
+            if (this._matches(watch, name)) {
+                watch = this.clientModel._outWatches[watch];
+                for (var i in watch) {
+                    watch[i](name, msg.data);
+                }
+            }
+        }
     };
-    // Server wants to watch an output.
-    AriClient.prototype._webcall_UNWATCHOUTPUT = function (msg) {
-        this.clientModel._outWatches[msg.name] = {};
-    };
-    //*************************************************************************
-    // Remote outputs
     /**
      * Watch remote client output - call function when output changes is notified.
      * Returns reference to the function. Store this to be able to unwatch for this specific callback in case you have more than one watch/callback on same value.
@@ -355,6 +367,10 @@ var AriClient = (function () {
         }
         this.clientModel._outWatches[name].push(callback);
         return callback;
+    };
+    // Server wants to watch an output.
+    AriClient.prototype._webcall_WATCHOUTPUT = function (msg) {
+        this.clientModel._outWatches[msg.name] = {};
     };
     /**
      * Provide original callback in case you have more than one callback per watch.
@@ -378,37 +394,9 @@ var AriClient = (function () {
             this.notify("UNWATCHOUTPUT", { "name": name });
         }
     };
-    // Server informs that a watched output changed.
-    AriClient.prototype._webcall_OUTPUT = function (msg) {
-        var name = msg.name;
-        if (!name)
-            return;
-        //console.log("VALUE:", name, "=", msg.value);
-        // Call all registered callbacks for watched values.
-        // Allow * watches!
-        var watch;
-        for (watch in this.clientModel._outWatches) {
-            if (this._matches(watch, name)) {
-                watch = this.clientModel._outWatches[watch];
-                for (var i in watch) {
-                    watch[i](name, msg.value);
-                }
-            }
-        }
-    };
-    // Get latest reported value from server.
-    /*
-    getOutputCache(name, callback) {
-        this._call("GETVALUE", { "name": name }, function (err, result) {
-            callback(err, result);
-        });
-    }
-    */
-    //*************************************************************************
-    // Remote inputs
-    // Set remote values.
-    AriClient.prototype.setInput = function (name, value) {
-        this.notify("SETINPUT", { "name": name, "value": value });
+    // Server wants to watch an output.
+    AriClient.prototype._webcall_UNWATCHOUTPUT = function (msg) {
+        this.clientModel._outWatches[msg.name] = {};
     };
     //*************************************************************************
     // Functions
@@ -419,13 +407,13 @@ var AriClient = (function () {
     };
     // Call function on remote client...
     AriClient.prototype.callFunction = function (functionName, params, callback) {
-        this.call("CALLFUNCTION", { "name": functionName, "params": params }, function (err, result) {
+        this.call("CALL", { "name": functionName, "params": params }, function (err, result) {
             callback(err, result);
         });
     };
     ;
     // Server calls function on this client...
-    AriClient.prototype._webcall_CALLFUNCTION = function (msg, callback) {
+    AriClient.prototype._webcall_CALL = function (msg, callback) {
         var rpcName = msg.name;
         if (!rpcName) {
             console.log("Error: Missing name of RPC to call! - Ignoring...");

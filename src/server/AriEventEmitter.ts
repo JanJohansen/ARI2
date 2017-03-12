@@ -15,7 +15,7 @@ export default class AriEventEmitter {
     /**
      * get named instance of event emitter. Call without parameter to get default emitter.
      */
-    static getInstance(emitterName: string = ""): AriEventEmitter{
+    static getInstance(emitterName: string = ""): EventEmitter2{
         if(!AriEventEmitter.instances[emitterName]) AriEventEmitter.instances[emitterName] = new AriEventEmitter();
         return AriEventEmitter.instances[emitterName];
     }

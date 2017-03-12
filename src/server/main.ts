@@ -12,7 +12,6 @@ import { httpServer } from './httpServer';
 //import wsServer from './wsServer';
 //import Executor from './nodeExecutor';
 import PluginLoader from './PluginLoader';
-import Ari from './ari';
 import AriClientServer from './ariClientServer';
 import AriEventEmitter from './AriEventEmitter';
 var ariEvents: any = AriEventEmitter.getInstance();
@@ -63,12 +62,11 @@ function handleNormalExit() {
 // Start httpServer + websocketServer....
 var http = new httpServer();
 var wss = new WebSocketServer({server: http.server});
-var ari = new Ari();
 
 // Set up "mediator" between components.
 wss.on("connection", (ws)=>{
 	log.trace("Client connecting");
-	var acs = new AriClientServer(ari);
+	var acs = new AriClientServer();
 
 	ws.on("message", (msg)=>{
         log.trace("<-", msg);
