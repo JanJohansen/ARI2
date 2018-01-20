@@ -1,6 +1,7 @@
 # ARI 2.0
 **Home Automation**  
-using an advanced "Automation Routing Infrastructure"
+"Automation Routing Infrastructure"
+Framework to enable "large scale application deployment" like home automation.
 
 **Note:** ARI2 is under development and cannot be used for anything else at the moment.
 
