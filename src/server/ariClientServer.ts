@@ -3,7 +3,46 @@ var log = loggingService.getLogger("ariClientServer");
 import AriEventEmitter from './AriEventEmitter';
 var ariEvent = AriEventEmitter.getInstance();
 
+/*
+Protocol:
+{<req: Number,> cmd: string, pars: object}
+{<res: Number,> cmd: string, pars: object}
+req/res only present if the telegram represents a request (e.g. remote function call)
+req/res not present if the telegram represents a notification without any return value (e.g. set parameter, etc.)
+Telegram with res member is a response to a request done where the req value. The res value will correspont to the sent req value.
 
+Commands:
+CONNECT
+REQAUTHTOKEN
+AUTHTOKEN
+SETCLIENTINFO
+WATCHVALUE
+VALUE
+UNWATCHVALUE
+GETVALUE
+SETVALUE
+CALLFUNCTION
+
+
+NEW:
+CONNECT
+REQAUTHTOKEN
+AUTHTOKEN
+SETMEMBERINFO {name, type, description, ...} {name} to clear!
+    type: input, output, io, function, object
+
+HueGW+getConfig = {type: "function", description: "", ...}
+HueGW+Livingroom.Light = {type: "Number", description: "", value: }
+
+Use EventEmitter2.
+Function calls:
+    AriClientServer subscribes to own clients name.**. (e.g. HueGW.**)
+    Set HueGW.getConfig() = rpcId + parameters
+    
+    
+
+
+*/
 
 import {EventEmitter} from 'events';
 
