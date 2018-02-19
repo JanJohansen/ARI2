@@ -1,23 +1,28 @@
+"use strict";
+/*
 // DONT delete: Will break typescript compilation! - Not finding node_modules! No idea why!?!??
 /// <reference path="../../typings/index.d.ts" />
-"use strict";
+*/
+Object.defineProperty(exports, "__esModule", { value: true });
 // Set up logging before loading any other modules! 
-var loggingService_1 = require('./loggingService');
+const loggingService_1 = require("./loggingService");
 loggingService_1.loggingService.setDefaultLevel("trace");
 loggingService_1.loggingService.addWriter(new loggingService_1.consoleLogWriter({ timestamp: true }));
 var log = loggingService_1.loggingService.getLogger("Main");
 log.info("ARI 2.0 Starting.");
-var httpServer_1 = require('./httpServer');
+const httpServer_1 = require("./httpServer");
 //import wsServer from './wsServer';
 //import Executor from './nodeExecutor';
-var PluginLoader_1 = require('./PluginLoader');
-var ariClientServer_1 = require('./ariClientServer');
-var AriEventEmitter_1 = require('./AriEventEmitter');
-var ariEvents = AriEventEmitter_1.default.getInstance();
+const PluginLoader_1 = require("./PluginLoader");
+const ariClientServer_1 = require("./ariClientServer");
+const AriEventEmitter_1 = require("./AriEventEmitter");
 var WebSocketServer = require('ws').Server;
+const net = require("net");
+const AriTcpClientServer_1 = require("./AriTcpClientServer");
 //*****************************************************************************
-ariEvents.onAny(function (event, args) {
-    log.trace("!!", event); //, args);
+var ariEvents = AriEventEmitter_1.default.getInstance();
+ariEvents.onAny((event, args) => {
+    log.trace("AriEvent:", event); //, args);
 });
 // Log uncaught exceptions.
 process.on('uncaughtException', function (error) {
@@ -54,23 +59,36 @@ function handleNormalExit() {
 var http = new httpServer_1.httpServer();
 var wss = new WebSocketServer({ server: http.server });
 // Set up "mediator" between components.
-wss.on("connection", function (ws) {
+wss.on("connection", (ws) => {
     log.trace("Client connecting");
     var acs = new ariClientServer_1.default();
-    ws.on("message", function (msg) {
+    ws.on("message", (msg) => {
         log.trace("<-", msg);
         acs.msgIn(msg);
     });
-    acs.on("msgOut", function (tlg) {
+    acs.on("msgOut", (tlg) => {
         log.trace("->", tlg);
         ws.send(tlg);
     });
-    acs.on("closeOut", function (tlg) { ws.close(); });
-    ws.on("error", function () { acs.disconnect(); });
-    ws.on("close", function () { acs.disconnect(); });
+    acs.on("closeOut", (tlg) => { ws.close(); });
+    ws.on("error", () => { acs.disconnect(); });
+    ws.on("close", () => { acs.disconnect(); });
     // Will acs leak memmory after disconnection?
+});
+//*****************************************************************************
+// Start TcpServer
+const server = net.createServer((socket) => {
+    // 'connection' listener
+    console.log('Tcp client connected');
+    var tcpAri = new AriTcpClientServer_1.default(socket);
+});
+server.on('error', (err) => {
+    throw err;
+});
+server.listen(3000, () => {
+    console.log('server bound');
 });
 //*****************************************************************************
 // Start plugins
 PluginLoader_1.default.start();
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/server/main.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/main.js.map

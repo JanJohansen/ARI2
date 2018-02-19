@@ -1,35 +1,34 @@
 "use strict";
-var loggingService_1 = require('./loggingService');
-var AriEventEmitter_1 = require('./AriEventEmitter');
+Object.defineProperty(exports, "__esModule", { value: true });
+const loggingService_1 = require("./loggingService");
+const AriEventEmitter_1 = require("./AriEventEmitter");
 var fs = require("fs");
 var cp = require('child_process');
+//import AriPluginBase from "./AriPluginBase";
 // Logging instance for Main...
-var PluginLoader = (function () {
-    function PluginLoader() {
-    }
-    PluginLoader.start = function () {
-        var _this = this;
+class PluginLoader {
+    constructor() { }
+    static start() {
         PluginLoader.LoadPluginInfo();
-        PluginLoader.ariEvents.on("pluginLoader.newPluginInfo", function (pluginInfo) {
+        PluginLoader.ariEvents.on("pluginLoader.newPluginInfo", (pluginInfo) => {
             PluginLoader.log.trace("New plugin detected.");
             // TODO: check if we should actually start the plugin according to user settings. (enabled / disabled!)
-            _this.LoadPlugin(pluginInfo);
+            this.LoadPlugin(pluginInfo);
         });
-    };
-    PluginLoader.LoadPluginInfo = function () {
-        var _this = this;
-        return new Promise(function (resolve, reject) {
-            var self = _this;
-            fs.readdir(_this.pluginsPath, function (err, files) {
+    }
+    static LoadPluginInfo() {
+        return new Promise((resolve, reject) => {
+            fs.readdir(__dirname + "/plugins", (err, files) => {
                 if (err) {
                     reject(Error("Path to plugins not found."));
                 }
-                files.forEach(function (dir) {
-                    fs.stat(self.pluginsPath + "/" + dir, function (error, stat) {
+                files.forEach((dir) => {
+                    PluginLoader.log.info("Looking for package.json in " + __dirname + "\\plugins\\" + dir);
+                    fs.stat(__dirname + "\\plugins\\" + dir, (error, stat) => {
                         if (stat && stat.isDirectory()) {
                             // We found sub-dir of plugins dir.
                             // Read manifest.
-                            fs.readFile(self.pluginsPath + "/" + dir + "/" + "package.json", function (err, data) {
+                            fs.readFile(__dirname + "/plugins/" + dir + "/" + "package.json", (err, data) => {
                                 try {
                                     var manifest = JSON.parse(data);
                                 }
@@ -40,12 +39,15 @@ var PluginLoader = (function () {
                                 if (manifest) {
                                     // Manifest available...
                                     if (manifest.AriPluginInfo) {
-                                        manifest.AriPluginInfo.pluginPath = self.pluginsPath + "/" + dir;
+                                        manifest.AriPluginInfo.pluginPath = PluginLoader.pluginsPath + "/" + dir;
                                         if (!manifest.AriPluginInfo.debugFilePath)
                                             manifest.AriPluginInfo.debugFilePath = manifest.AriPluginInfo.pluginPath;
-                                        self.pluginInfos[dir] = manifest.AriPluginInfo;
+                                        PluginLoader.pluginInfos[dir] = manifest.AriPluginInfo;
                                         PluginLoader.ariEvents.emit("pluginLoader.newPluginInfo", manifest.AriPluginInfo);
                                     }
+                                }
+                                else {
+                                    PluginLoader.log.trace("Missing manifest (package.json) in plugin folder.");
                                 }
                             });
                         } // else its a file or error...
@@ -54,15 +56,28 @@ var PluginLoader = (function () {
                 resolve();
             });
         });
-    };
-    PluginLoader.LoadPlugin = function (plugin) {
+    }
+    static LoadPlugin(plugin) {
         if (!(plugin.name && plugin.main)) {
             PluginLoader.log.error("Error in configuration file when loading plugin.");
             return;
         }
-        PluginLoader.log.info("Loading plugin:", plugin.name);
+        PluginLoader.log.info("Loading plugin: " + plugin.name + " (" + plugin.pluginPath + "/" + plugin.main);
         if (PluginLoader.loadLocal) {
-            require(plugin.pluginPath + "/" + plugin.main);
+            //try {
+            let plug = require(plugin.pluginPath + "/" + plugin.main);
+            if (plug.init)
+                plug.init(this);
+            else if (plug.default) {
+                let plugInstance = new plug.default(this);
+                //plugInstance.init(this);
+            }
+            else
+                PluginLoader.log.error("Missing init function in plugin: " + plugin.name);
+            /*} catch (e) {
+                PluginLoader.log.info(e);
+                PluginLoader.log.error("Error when loading plugin (" + plugin.name + ") from file (" + plugin.pluginPath + "/" + plugin.main + ")");
+            }*/
         }
         else {
             if (!plugin.arguments)
@@ -84,14 +99,12 @@ var PluginLoader = (function () {
             });
             PluginLoader.ariEvents.emit("pluginLoader.pluginLoaded", plugin.name);
         }
-    };
-    PluginLoader.pluginsPath = __dirname + "/plugins";
-    PluginLoader.pluginInfos = {};
-    PluginLoader.ariEvents = AriEventEmitter_1.default.getInstance();
-    PluginLoader.log = loggingService_1.loggingService.getLogger("PluginLoader");
-    PluginLoader.loadLocal = true; // Set this to load plugins into existing V8 engine instead of spawning a new process.
-    return PluginLoader;
-}());
-Object.defineProperty(exports, "__esModule", { value: true });
+    }
+}
+PluginLoader.pluginsPath = "./plugins"; //__dirname + "/plugins";
+PluginLoader.pluginInfos = {};
+PluginLoader.ariEvents = AriEventEmitter_1.default.getInstance();
+PluginLoader.log = loggingService_1.loggingService.getLogger("PluginLoader");
+PluginLoader.loadLocal = true; // Set this to load plugins into existing V8 engine instead of spawning a new process.
 exports.default = PluginLoader;
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/server/PluginLoader.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/PluginLoader.js.map

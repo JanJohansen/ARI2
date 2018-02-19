@@ -1,10 +1,12 @@
+/*
 // DONT delete: Will break typescript compilation! - Not finding node_modules! No idea why!?!??
 /// <reference path="../../typings/index.d.ts" />
+*/
 
 // Set up logging before loading any other modules! 
 import { loggingService, consoleLogWriter } from './loggingService';
 loggingService.setDefaultLevel("trace");
-loggingService.addWriter(new consoleLogWriter({timestamp: true}));
+loggingService.addWriter(new consoleLogWriter({ timestamp: true }));
 var log = loggingService.getLogger("Main");
 log.info("ARI 2.0 Starting.");
 
@@ -14,26 +16,28 @@ import { httpServer } from './httpServer';
 import PluginLoader from './PluginLoader';
 import AriClientServer from './ariClientServer';
 import AriEventEmitter from './AriEventEmitter';
-var ariEvents: any = AriEventEmitter.getInstance();
-
 var WebSocketServer = require('ws').Server;
+import * as net from "net";
+import AriTcpClientServer from './AriTcpClientServer';
 
 //*****************************************************************************
-ariEvents.onAny((event, args)=>{
-    log.trace("!!", event);//, args);
+var ariEvents: any = AriEventEmitter.getInstance();
+
+ariEvents.onAny((event, args) => {
+    log.trace("AriEvent:", event);//, args);
 });
 
 // Log uncaught exceptions.
 process.on('uncaughtException', function (error) {
-   log.fatal(error);
-   // TODO: Write (synchroneously) to special crash log file...
-   // The correct use of 'uncaughtException' is to perform synchronous cleanup of allocated resources 
-   // (e.g. file descriptors, handles, etc) before shutting down the process. 
-   // It is not safe to resume normal operation after 'uncaughtException'.
-   process.exit(1);
+    log.fatal(error);
+    // TODO: Write (synchroneously) to special crash log file...
+    // The correct use of 'uncaughtException' is to perform synchronous cleanup of allocated resources 
+    // (e.g. file descriptors, handles, etc) before shutting down the process. 
+    // It is not safe to resume normal operation after 'uncaughtException'.
+    process.exit(1);
 });
 
-process.on ("SIGINT", function(){
+process.on("SIGINT", function () {
     log.warn("User typed Ctrl+C... Shutting down.");
     process.exit();
 });
@@ -61,28 +65,42 @@ function handleNormalExit() {
 //*****************************************************************************
 // Start httpServer + websocketServer....
 var http = new httpServer();
-var wss = new WebSocketServer({server: http.server});
+var wss = new WebSocketServer({ server: http.server });
 
 // Set up "mediator" between components.
-wss.on("connection", (ws)=>{
-	log.trace("Client connecting");
-	var acs = new AriClientServer();
+wss.on("connection", (ws) => {
+    log.trace("Client connecting");
+    var acs = new AriClientServer();
 
-	ws.on("message", (msg)=>{
+    ws.on("message", (msg) => {
         log.trace("<-", msg);
         acs.msgIn(msg);
     });
-	acs.on("msgOut", (tlg)=>{
+    acs.on("msgOut", (tlg) => {
         log.trace("->", tlg);
         ws.send(tlg);
     });
-	acs.on("closeOut", (tlg)=>{ws.close();});
+    acs.on("closeOut", (tlg) => { ws.close(); });
 
-	ws.on("error", ()=>{acs.disconnect();});
-	ws.on("close", ()=>{acs.disconnect();});
-	
-	// Will acs leak memmory after disconnection?
-	
+    ws.on("error", () => { acs.disconnect(); });
+    ws.on("close", () => { acs.disconnect(); });
+
+    // Will acs leak memmory after disconnection?
+
+});
+
+//*****************************************************************************
+// Start TcpServer
+const server = net.createServer((socket) => {
+    // 'connection' listener
+    console.log('Tcp client connected');
+    var tcpAri = new AriTcpClientServer(socket);
+});
+server.on('error', (err) => {
+    throw err;
+});
+server.listen(3000, () => {
+    console.log('server bound');
 });
 
 //*****************************************************************************

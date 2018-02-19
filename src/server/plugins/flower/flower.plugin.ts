@@ -9,7 +9,7 @@ import * as Flower from './Flower';
 
 var ari = new AriClient("Flower_plugin", {password: "please"});
 console.log("Registering callbacks on FlowerPlugin");
-ari.on("connect", ()=>{
+ari.on("connect", () => {
 
     console.log("FlowerPlugin", "Flower plugin started and connected.");
 
@@ -29,7 +29,7 @@ ari.on("connect", ()=>{
     // Do stuff...
     var counter = 0;
     setInterval(()=>{ 
-        out1.send(counter); 
+        //out1.send(counter++); 
     }, 1000);
 
 });

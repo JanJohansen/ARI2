@@ -1,7 +1,8 @@
 "use strict";
-var ariClientServer_1 = require('./ariClientServer');
-var AriServerServer = (function () {
-    function AriServerServer() {
+Object.defineProperty(exports, "__esModule", { value: true });
+const ariClientServer_1 = require("./ariClientServer");
+class AriServerServer {
+    constructor() {
         this.ari = ariClientServer_1.default.ari;
         this.clientModel = {
             name: "ARI",
@@ -20,17 +21,17 @@ var AriServerServer = (function () {
                 this.clientModel.functions[fname] = { "name": fname };
             }
         }
-        this.provideValues();
+        //this.provideValues();
     }
     // Server provided values. ****************************************************
-    AriServerServer.prototype.provideValues = function () {
+    provideValues() {
         var self = this;
         this.serverStarted = new Date().toISOString();
         self._server.handleValue("ari.serverStart", this.serverStarted);
         this.provideTime(0); // Starts providing time.
-    };
+    }
     // Provide time when milliseconds == 0,
-    AriServerServer.prototype.provideTime = function (interval) {
+    provideTime(interval) {
         var self = this;
         setTimeout(function () {
             var date = new Date();
@@ -44,8 +45,8 @@ var AriServerServer = (function () {
                 self._server.handleValue("ari.time", date.toISOString());
             }
         }, interval);
-    };
-    AriServerServer.prototype.call = function (command, parameters, callback) {
+    }
+    call(command, parameters, callback) {
         if (command == "CALLFUNCTION") {
             var rpcName = parameters.name;
             if (!rpcName) {
@@ -61,14 +62,12 @@ var AriServerServer = (function () {
             // Call local function.
             this["_webcall_" + rpcName](parameters.params, callback);
         }
-    };
+    }
     //*************************************************************************
     // Function calls on Server!
-    AriServerServer.prototype._webcall_getClients = function (args, callback) {
+    _webcall_getClients(args, callback) {
         callback(null, this.ari.clients);
-    };
-    return AriServerServer;
-}());
-Object.defineProperty(exports, "__esModule", { value: true });
+    }
+}
 exports.default = AriServerServer;
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/server/ariServerServer.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/ariServerServer.js.map

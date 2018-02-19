@@ -1,12 +1,13 @@
 "use strict";
-var fs = require("fs");
-var ConfigStore = (function () {
-    function ConfigStore(path, fileName) {
+Object.defineProperty(exports, "__esModule", { value: true });
+const fs = require("fs");
+class ConfigStore {
+    constructor(path, fileName) {
         this.path = path;
         this.fileName = fileName;
         this.config = {};
     }
-    ConfigStore.prototype.load = function () {
+    load() {
         // Load config from file...
         try {
             var str = fs.readFileSync(this.path + "/" + this.fileName + ".json", 'utf8');
@@ -27,10 +28,8 @@ var ConfigStore = (function () {
         }
         ;
         return this.config;
-    };
-    ConfigStore.prototype.save = function (configObject, prettify) {
-        if (configObject === void 0) { configObject = undefined; }
-        if (prettify === void 0) { prettify = null; }
+    }
+    save(configObject = undefined, prettify = null) {
         if (configObject)
             var config = configObject;
         else
@@ -40,17 +39,15 @@ var ConfigStore = (function () {
         else
             prettify = null;
         fs.writeFileSync(this.path + "/" + this.fileName + ".json", JSON.stringify(config, this.jsonReplacer, prettify));
-    };
-    ConfigStore.prototype.jsonReplacer = function (key, value) {
+    }
+    jsonReplacer(key, value) {
         //console.log("-- ", key, ",", value);
         if (key == undefined)
             return value;
         if (key.indexOf('__') == 0)
             return undefined; // Don's show hidden non-usable members indicated by double underscore __.
         return value;
-    };
-    return ConfigStore;
-}());
-Object.defineProperty(exports, "__esModule", { value: true });
+    }
+}
 exports.default = ConfigStore;
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/server/configStore.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/configStore.js.map

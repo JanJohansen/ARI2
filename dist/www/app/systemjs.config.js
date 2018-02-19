@@ -41,4 +41,4 @@
         }
     });
 })(this);
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/www/app/systemjs.config.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/www/app/systemjs.config.js.map

@@ -1,0 +1,15 @@
+{
+  "version": "0.2.1",
+  "tasks": [
+    {
+      "taskName": "task-ARI2",
+      "appliesTo": "/",
+      "type": "launch"
+    },
+    {
+      "taskName": "task-dist",
+      "appliesTo": "dist/",
+      "type": "launch"
+    }
+  ]
+}

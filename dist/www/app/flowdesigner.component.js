@@ -8,9 +8,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var core_1 = require('@angular/core');
-var FlowDesignerComponent = (function () {
-    function FlowDesignerComponent(el) {
+Object.defineProperty(exports, "__esModule", { value: true });
+const core_1 = require("@angular/core");
+let FlowDesignerComponent = class FlowDesignerComponent {
+    constructor(el) {
         this.flow = {
             nodes: [
                 { name: "Node 1", x: 50, y: 50, width: 200,
@@ -93,28 +94,28 @@ var FlowDesignerComponent = (function () {
         this.mouseMoveHandler = this.nodeMouseMove.bind(this);
         this.mouseUpHandler = this.nodeMouseUp.bind(this);
     }
-    FlowDesignerComponent.prototype.logJSON = function (o) {
+    logJSON(o) {
         console.log(o);
-    };
+    }
     // Utility function calculating max of input and output count.
-    FlowDesignerComponent.prototype.maxIOs = function (node) {
+    maxIOs(node) {
         //return 3;
         if (node.inputs.length > node.outputs.length)
             return node.inputs.length;
         else
             return node.outputs.length;
-    };
-    FlowDesignerComponent.prototype.nodeSelected = function (node) {
+    }
+    nodeSelected(node) {
         if (node == this.selectedNode)
             return true;
         else
             return false;
-    };
+    }
     //************************************************************************* 
     // Helpers
     //*************************************************************************
     // Get point in global SVG space
-    FlowDesignerComponent.prototype.cursorPoint = function (evt) {
+    cursorPoint(evt) {
         //        var pt = evt.target.farthestViewportElement.createSVGPoint();
         var pt = this.el.nativeElement.firstElementChild.createSVGPoint();
         pt.x = evt.clientX;
@@ -122,11 +123,11 @@ var FlowDesignerComponent = (function () {
         //var ctm = evt.target.farthestViewportElement.getScreenCTM();
         var ctm = this.el.nativeElement.firstElementChild.getScreenCTM();
         return pt.matrixTransform(ctm.inverse());
-    };
+    }
     //************************************************************************* 
     // Pointer handlers
     //*************************************************************************
-    FlowDesignerComponent.prototype.svgMouseDown = function (event) {
+    svgMouseDown(event) {
         console.log("svgMouseDown!");
         this.selectedNode = null;
         /*if(event.button == 2) { // Right mouse button... TODO: Support sheep :O)
@@ -138,16 +139,16 @@ var FlowDesignerComponent = (function () {
             event.stopPropagation();    // Don't continue event
         }*/
         //event.stopPropagation();
-    };
-    FlowDesignerComponent.prototype.svgMouseMove = function (event) {
+    }
+    svgMouseMove(event) {
         if (this.flow._newConnection) {
             // A new connection is being drawn.
             var pos = this.cursorPoint(event);
             this.flow._newConnection.x2 = pos.x;
             this.flow._newConnection.y2 = pos.y;
         }
-    };
-    FlowDesignerComponent.prototype.svgMouseUp = function (event) {
+    }
+    svgMouseUp(event) {
         console.log("svgMouseUp!");
         if (this.flow._newConnection) {
             delete this.flow._newConnection;
@@ -157,8 +158,8 @@ var FlowDesignerComponent = (function () {
             delete this.flow._menu;
         }*/
         //event.preventDefault();
-    };
-    FlowDesignerComponent.prototype.nodeMouseDown = function ($event, node) {
+    }
+    nodeMouseDown($event, node) {
         console.log("nodeMouseDown:", $event, node);
         event.preventDefault();
         event.stopPropagation(); // Don't continue event
@@ -172,9 +173,9 @@ var FlowDesignerComponent = (function () {
         this.el.nativeElement.addEventListener('mousemove', this.mouseMoveHandler);
         this.el.nativeElement.addEventListener('mouseup', this.mouseUpHandler);
         //this.element.nativeElement.style.x = "5";
-    };
+    }
     //@HostListener('document:mousemove', ['$event']) onMousemove(event) {
-    FlowDesignerComponent.prototype.nodeMouseMove = function (event) {
+    nodeMouseMove(event) {
         if (this.dragging) {
             //console.log("nodeMouseMove:", event);
             var pos = this.cursorPoint(event);
@@ -185,8 +186,8 @@ var FlowDesignerComponent = (function () {
                 this.dragginNode.y = this.dragginNode.y - (this.dragginNode.y % 10);
             }
         }
-    };
-    FlowDesignerComponent.prototype.nodeMouseUp = function ($event, node) {
+    }
+    nodeMouseUp($event, node) {
         console.log("nodeMouseUp:", $event, node);
         event.stopPropagation(); // Don't continue event
         event.preventDefault();
@@ -195,24 +196,25 @@ var FlowDesignerComponent = (function () {
         if (this.dragging) {
             this.dragging = false;
         }
-    };
-    FlowDesignerComponent.prototype.nodeClick = function (event, node) {
+    }
+    nodeClick(event, node) {
         event.stopPropagation();
         //event.preventDefault();
-    };
-    FlowDesignerComponent.prototype.findNode = function (nodeName, inputName) {
+    }
+    findNode(nodeName, inputName) {
         for (var i = 0; i < this.flow.nodes.length; i++) {
             var node = this.flow.nodes[i];
             if (node.name == nodeName) {
                 for (var j = 0; j < node.inputs.length; j++) {
                     if (node.inputs[j].name == inputName)
                         return [node, j];
+                    //else return [node, 0];
                 }
             }
         }
         return [null, 0];
-    };
-    FlowDesignerComponent.prototype.getConnectionPath = function (node, out, connection, i) {
+    }
+    getConnectionPath(node, out, connection, i) {
         //console.log(node, out);
         // Insert *ref to det input to use
         if (!connection.iRef) {
@@ -227,8 +229,8 @@ var FlowDesignerComponent = (function () {
             " " + (iNode.x - 10 - 50) + "," + (iNode.y + 35 + iIdx * 25) +
             " " + (iNode.x - 10) + "," + (iNode.y + 35 + iIdx * 25);
         return d;
-    };
-    FlowDesignerComponent.prototype.getNewConnectionPath = function (x1, y1, x2, y2) {
+    }
+    getNewConnectionPath(x1, y1, x2, y2) {
         var tangent;
         if (this.newConnectionFromOutput)
             tangent = 50;
@@ -239,8 +241,8 @@ var FlowDesignerComponent = (function () {
             " " + (x2 - tangent) + "," + (y2) +
             " " + (x2) + "," + (y2);
         return d;
-    };
-    FlowDesignerComponent.prototype.inputMouseDown = function (node, i) {
+    }
+    inputMouseDown(node, i) {
         console.log("inputMouseDown!");
         this.newConnectionFromOutput = false;
         this.newConnectionStartNode = node;
@@ -253,8 +255,8 @@ var FlowDesignerComponent = (function () {
         };
         event.stopPropagation(); // Don't continue event
         event.preventDefault();
-    };
-    FlowDesignerComponent.prototype.outputMouseDown = function (node, i) {
+    }
+    outputMouseDown(node, i) {
         console.log("outputMouseDown!");
         this.newConnectionFromOutput = true;
         this.newConnectionStartNode = node;
@@ -267,8 +269,8 @@ var FlowDesignerComponent = (function () {
         };
         event.stopPropagation(); // Don't continue event
         event.preventDefault();
-    };
-    FlowDesignerComponent.prototype.inputMouseUp = function (node, i) {
+    }
+    inputMouseUp(node, i) {
         console.log("inputMouseUp!");
         if (this.flow._newConnection && this.newConnectionFromOutput) {
             console.log("Make new connection from", this.newConnectionStartNode.name, this.newConnectionStartxPutIndex, "to", node.name, i);
@@ -278,8 +280,8 @@ var FlowDesignerComponent = (function () {
             delete this.flow._newConnection;
         }
         event.stopPropagation();
-    };
-    FlowDesignerComponent.prototype.outputMouseUp = function (node, i) {
+    }
+    outputMouseUp(node, i) {
         console.log("outputMouseUp!");
         if (this.flow._newConnection && !this.newConnectionFromOutput) {
             console.log("Make new connection from", this.newConnectionStartNode.name, this.newConnectionStartxPutIndex, "to", node.name, i);
@@ -289,17 +291,26 @@ var FlowDesignerComponent = (function () {
             delete this.flow._newConnection;
         }
         event.stopPropagation();
-    };
-    FlowDesignerComponent.prototype.connectionMouseDown = function (node, out, oi, i, $event) {
+    }
+    connectionMouseDown(node, out, oi, i, $event) {
         // Select connection.
-    };
-    FlowDesignerComponent.prototype.svgKeyDown = function (event) {
+        console.log("connectionMouseDown:", event);
+        node.outputs[oi].connect[i].selected = true;
+        this.selectedConnections.push(node.outputs[oi].connect[i]);
+        event.stopPropagation();
+    }
+    connectionMouseUp(node, out, oi, i, $event) {
+        // Select connection.
+        console.log("connectionMouseUp:", event);
+        //delete node.outputs[oi].connect[i].selected;
+        event.stopPropagation();
+    }
+    svgKeyDown(event) {
         console.log("KeyDown:", event);
         if (event.key == "Delete") {
         }
-    };
-    FlowDesignerComponent.prototype.menuSelected = function (_a) {
-        var path = _a.path, event = _a.event, item = _a.item;
+    }
+    menuSelected({ path: path, event: event, item: item }) {
         console.log("Menu selected:", path);
         var path = path.split("->");
         console.log(path);
@@ -317,16 +328,16 @@ var FlowDesignerComponent = (function () {
                 ]
             });
         }
-    };
-    FlowDesignerComponent = __decorate([
-        core_1.Component({
-            selector: "ariflowdesigner",
-            styleUrls: ['app/flowdesigner.component.css'],
-            templateUrl: 'app/flowdesigner.component.html' //,
-        }), 
-        __metadata('design:paramtypes', [core_1.ElementRef])
-    ], FlowDesignerComponent);
-    return FlowDesignerComponent;
-}());
+    }
+};
+FlowDesignerComponent = __decorate([
+    core_1.Component({
+        selector: "ariflowdesigner",
+        styleUrls: ['app/flowdesigner.component.css'],
+        templateUrl: 'app/flowdesigner.component.html' //,
+        //directives: [ ContextMenuComponent ]
+    }),
+    __metadata("design:paramtypes", [core_1.ElementRef])
+], FlowDesignerComponent);
 exports.FlowDesignerComponent = FlowDesignerComponent;
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/www/app/flowdesigner.component.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/www/app/flowdesigner.component.js.map

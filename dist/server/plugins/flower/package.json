@@ -20,7 +20,7 @@
             "email": ""
         },
         "fa-icon": "fa-wrench",
-        "main": "flower.plugin.js",
+        "main": "main.js",
         "args": "",
         "views": [
             {

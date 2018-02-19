@@ -8,7 +8,7 @@
             "program": "${workspaceRoot}/src/server/main.ts",
             "stopOnEntry": false,
             "args": [],
-            "cwd": "${workspaceRoot}/dist",
+            "cwd": "${workspaceRoot}/dist/server/",
             "preLaunchTask": null,            
             "runtimeExecutable": null,
             "runtimeArgs": [ "--nolazy" ],
@@ -16,6 +16,15 @@
             "console": "externalTerminal",
             "sourceMaps": true,
             "outDir": "${workspaceRoot}/dist/server"
+        },
+        {
+            "name": "Attach",
+            "type": "node",
+            "request": "attach",
+            "address": "localhost",
+            "port": 9229,
+            "protocol": "inspector",
+            "sourceMaps": true
         }
     ]
 }

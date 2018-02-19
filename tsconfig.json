@@ -1,5 +1,6 @@
 {
   "include":[
+    "./src/**/*.ts",
     "./src/server/**/*.ts",
     "./src/www/**/*.ts"
   ],
@@ -8,7 +9,7 @@
     "typings"
   ],
   "compilerOptions": {
-    "target": "es5",
+    "target": "es6",
     "module": "commonjs",
     "sourceMap": true,
     "emitDecoratorMetadata": true, // in order to use Angular 2 decorators in TypeScript
@@ -18,6 +19,13 @@
     "moduleResolution": "node",
     "outDir": "dist",
     "mapRoot": "dist",
-    "sourceRoot": "src" // Point map files to where original ts file is located.
+    "sourceRoot": "src", // Point map files to where original ts file is located.
+    "typeRoots": [
+      "node_modules/@types/"
+    ],
+    "types": [
+      "node",
+      "core-js"
+    ]
   }
 }

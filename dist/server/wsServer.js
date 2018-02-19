@@ -1,14 +1,15 @@
 "use strict";
-var loggingService_1 = require('./loggingService');
+Object.defineProperty(exports, "__esModule", { value: true });
+const loggingService_1 = require("./loggingService");
 var log = loggingService_1.loggingService.getLogger("wsServer");
-var AriEventEmitter_1 = require('./AriEventEmitter');
+const AriEventEmitter_1 = require("./AriEventEmitter");
 var ariEvent = AriEventEmitter_1.default.getInstance();
 var WebSocketServer = require('ws').Server;
-var wsServer = (function () {
-    function wsServer(httpServer) {
+class wsServer {
+    constructor(httpServer) {
         log.debug("Starting wsServer...");
         var wss = new WebSocketServer({ server: httpServer });
-        wss.on('connection', function (ws) {
+        wss.on('connection', (ws) => {
             // Client connected
             log.debug('Client connected.');
             // TODO: Log IP of client... ws.upgradeReq.connection.remoteAddress doesnt work :O()
@@ -19,21 +20,21 @@ var wsServer = (function () {
             var connection = {};
             connection.webSocket = ws;
             ariEvent.emit("client.connect", connection);
-            ws.on('message', function (message) {
+            ws.on('message', (message) => {
                 log.debug("<-", message);
                 ariEvent.emit("client.message", connection, message);
             });
-            ws.on('close', function () {
+            ws.on('close', () => {
                 log.debug("Connection from ", ws.origin, " closed!");
                 ariEvent.emit("client.disconnect", connection);
                 delete connection.webSocket;
             });
-            ws.on('error', function () {
+            ws.on('error', () => {
                 log.debug("Connection from ", ws.origin, " had error!");
                 ariEvent.emit("client.disconnect", connection);
                 delete connection.webSocket;
             });
-            ariEvent.on("ariClientServer.send", function (connection, message) {
+            ariEvent.on("ariClientServer.send", (connection, message) => {
                 var ws = connection.webSocket;
                 if (ws.readyState !== ws.OPEN) {
                     log.error('ERROR!!! - WS not opened, trying to send', message);
@@ -43,7 +44,7 @@ var wsServer = (function () {
                     ws.send(message);
                 }
             });
-            ariEvent.on("ariClientServer.close", function (connection, message) {
+            ariEvent.on("ariClientServer.close", (connection, message) => {
                 var ws = connection.webSocket;
                 log.debug("Error from clientServer!?");
                 ws.close();
@@ -51,8 +52,6 @@ var wsServer = (function () {
             });
         });
     }
-    return wsServer;
-}());
-Object.defineProperty(exports, "__esModule", { value: true });
+}
 exports.default = wsServer;
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/server/wsServer.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/wsServer.js.map

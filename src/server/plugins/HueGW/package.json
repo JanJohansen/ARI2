@@ -1,0 +1,42 @@
+{
+    "name": "flower",
+    "version": "0.0.0",
+    "description": "Flow based programming environment for ARI 2.0",
+    "homepage": "http://www.johansenweb.dk",
+    "author": {
+        "name": "Jan Johansen",
+        "email": "jan@johansenweb.dk"
+    },
+    "main": "index.js",
+    "dependencies": {},
+    "devDependencies": {},
+    "AriPluginInfo": {
+        "name": "HueGW",
+        "version": "0.0.0",
+        "description": "Gateway for Philips HUE lighting system.",
+        "homepage": "?",
+        "author": {
+            "name": "Jan Johansen",
+            "email": ""
+        },
+        "fa-icon": "fa-wrench",
+        "main": "main.js",
+        "args": "",
+        "views": [
+            {
+                "name": "Designer",
+                "fa-icon": "fa-wrench",
+                "description": "Flow based designer.",
+                "ngComponent": "www/designer.component.js",
+                "minDefaultTargetRole": "admin"
+            },
+            {
+                "name": "Panels",
+                "fa-icon": "fa-sliders",
+                "description": "User interaction panels.",
+                "ngComponent": "www/panels.component.js",
+                "minDefaultTargetRole": "user"
+            }
+        ]
+    }
+}

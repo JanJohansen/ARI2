@@ -28,7 +28,7 @@ export default class AriServerServer{
             }
         }
         
-        this.provideValues();
+        //this.provideValues();
     }
 
     // Server provided values. ****************************************************

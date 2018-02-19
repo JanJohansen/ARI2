@@ -91,19 +91,21 @@
             </svg:text>
         </svg:g>
     </svg:g>
-
-    <template ngFor let-node [ngForOf]="flow.nodes">
-        <template ngFor let-out [ngForOf]="node.outputs" let-oi="index">
-            <template ngFor let-connection [ngForOf]="out.connect" let-i="index">
+    
+    <!-- Connections -->
+    <ng-template ngFor let-node [ngForOf]="flow.nodes">
+        <ng-template ngFor let-out [ngForOf]="node.outputs" let-oi="index">
+            <ng-template ngFor let-connection [ngForOf]="out.connect" let-i="index">
                 <svg:path
                     (mousedown)="connectionMouseDown(node, out, oi, i, $event)"
-                    [attr.class]="'connection-line'"
+                    (mouseup)="connectionMouseUp(node, out, oi, i, $event)"
+                    [ngClass]="{'connection-line': !connection.selected, 'selected-line': connection.selected}"
                     [attr.d]= "getConnectionPath(node, out, connection, oi)"
                 >
                 </svg:path>
-            </template>
-        </template>
-    </template>
+            </ng-template>
+        </ng-template>
+    </ng-template>
 
     <svg:path *ngIf="flow._newConnection"
         class="dragging-connection-line"

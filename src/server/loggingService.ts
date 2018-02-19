@@ -58,7 +58,7 @@ export class loggingService {
     }
 }
 
-class loggerInstance {
+export class loggerInstance {
     name: string;
     constructor(name: string) {
         this.name = name;
@@ -95,7 +95,7 @@ export class logWriterBase {
     handleLogInput(loggerName: string, level: number, ...args){
         // Filter log accordint to config.
         var minLevel = this.levels[loggerName] || loggingService.defaultLevel;
-        if(level >= minLevel) this.writeLog(loggerName, loggingService.levelToString(level), args);
+        if(level >= minLevel) this.writeLog(loggerName, loggingService.levelToString(level), ...args);
     }
 
     writeLog(loggerName: string, level: string, ...args){
@@ -113,7 +113,7 @@ export class consoleLogWriter extends logWriterBase {
 
     writeLog(loggerName, level: string, ...args){
         if(this.writeTimeStamp) {
-            var a = args.join(' '); // TODO: FIX since this doesnt work!!!
+            var a = args.join(' ');
             console.log(new Date(Date.now()).toISOString(), "\t", level, "\t", loggerName, "\t", a);
         }
         else {

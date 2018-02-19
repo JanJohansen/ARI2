@@ -72,6 +72,13 @@ Style for connections.
 	fill: transparent;
 }	
 
+.selected-line
+{
+	stroke: red;
+	stroke-width: 4;
+	fill: transparent;
+}	
+
 .mouseover-connection-line {
 	stroke: black;
 	stroke-width: 6;

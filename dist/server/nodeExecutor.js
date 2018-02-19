@@ -1,93 +1,86 @@
 "use strict";
-var loggingService_1 = require('./loggingService');
+Object.defineProperty(exports, "__esModule", { value: true });
+const loggingService_1 = require("./loggingService");
 var log = loggingService_1.loggingService.getLogger("nodeExecutor");
-var nodeExecutor = (function () {
-    function nodeExecutor() {
+class nodeExecutor {
+    constructor() {
         this.functionBlocks = [];
         log.trace("Trace test!");
         log.info("NodeExecutor started...");
         this.loadFunctionBlocks();
     }
-    nodeExecutor.prototype.loadFunctionBlocks = function () {
-        var lib = require('./lib_misc');
+    loadFunctionBlocks() {
+        let lib = require('./lib_misc');
         //log.info(lib);
         for (var key in lib) {
-            var libClass = lib[key];
+            let libClass = lib[key];
             log.info("--------");
             log.info("Function:", key);
             log.info("Display name:", libClass.displayName);
             log.info("Description:", libClass.description);
             this.functionBlocks.push({ name: key, functionClass: libClass });
         }
-    };
-    nodeExecutor.prototype.getFunctions = function () {
+    }
+    getFunctions() {
         return this.functionBlocks;
-    };
-    nodeExecutor.connect = function (output, input) {
-        output.addListener(function (data) {
+    }
+    static connect(output, input) {
+        output.addListener((data) => {
             input.value = data;
         });
-    };
-    nodeExecutor.prototype.disconnect = function (output, input) {
-        output.addListener(function (data) {
+    }
+    disconnect(output, input) {
+        output.addListener((data) => {
             input.value = data;
         });
-    };
-    return nodeExecutor;
-}());
-Object.defineProperty(exports, "__esModule", { value: true });
+    }
+}
 exports.default = nodeExecutor;
-var nodeIOBase = (function () {
-    function nodeIOBase(name, type, description) {
+class nodeIOBase {
+    constructor(name, type, description) {
         this.listeners = [];
         this.name = name;
         this.type = type;
         this.description = description;
     }
-    Object.defineProperty(nodeIOBase.prototype, "value", {
-        get: function () {
-            return this._value;
-        },
-        set: function (value) {
-            this._value = value;
-            this.listeners.forEach(function (callback) {
-                callback(value);
-            });
-        },
-        enumerable: true,
-        configurable: true
-    });
-    nodeIOBase.prototype.addListener = function (callback) {
+    get value() {
+        return this._value;
+    }
+    set value(value) {
+        this._value = value;
+        this.listeners.forEach(callback => {
+            callback(value);
+        });
+    }
+    addListener(callback) {
         this.listeners.push(callback);
-    };
+    }
     ;
-    nodeIOBase.prototype.removeListener = function (callback) {
+    removeListener(callback) {
         this.listeners.splice(this.listeners.indexOf(callback), 1);
-    };
+    }
     ;
-    return nodeIOBase;
-}());
+}
 exports.nodeIOBase = nodeIOBase;
-var nodeBase = (function () {
-    function nodeBase(uid) {
+class nodeBase {
+    constructor(uid) {
         this.inputs = [];
         this.outputs = [];
         this.uid = uid;
         nodeBase.description = "";
     }
-    nodeBase.prototype.createInput = function (name, type, description) {
-        var input = new nodeIOBase(name, type, description);
+    createInput(name, type, description) {
+        let input = new nodeIOBase(name, type, description);
         this.inputs.push(input);
         return input;
-    };
-    nodeBase.prototype.createOutput = function (name, type, description) {
-        var output = new nodeIOBase(name, type, description);
+    }
+    createOutput(name, type, description) {
+        let output = new nodeIOBase(name, type, description);
         this.outputs.push(output);
         return output;
-    };
-    nodeBase.displayName = "Anonymous";
-    nodeBase.description = "";
-    return nodeBase;
-}());
+    }
+}
+nodeBase.displayName = "Anonymous";
+nodeBase.description = "";
 exports.nodeBase = nodeBase;
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/server/nodeExecutor.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/nodeExecutor.js.map

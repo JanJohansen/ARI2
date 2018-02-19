@@ -1,12 +1,12 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var WebSocket = require('ws');
-var AriClient = (function () {
+class AriClient {
     /**
      * Create NEW instance of AriClient.
      * If you want to use AriClient as a singletone use the "getInstance" static member.
      */
-    function AriClient(name, options) {
-        if (options === void 0) { options = {}; }
+    constructor(name, options = {}) {
         this.reconnectInterval = 2000; // Interval in ms.
         this.isConnected = false;
         this.clientModel = { ins: {}, outs: {}, functions: {}, _outWatches: {} };
@@ -38,38 +38,33 @@ var AriClient = (function () {
             return AriClient._instance;
         }
     */
-    AriClient.prototype.on = function (event, callback) {
+    on(event, callback) {
         if (!this._events[event])
             this._events[event] = [];
         this._events[event].push(callback);
         return callback;
-    };
-    AriClient.prototype.off = function (event, callback) {
+    }
+    off(event, callback) {
         if (!this._events[event])
             return false;
-        var pos = this._events[event].indexOf(callback);
+        let pos = this._events[event].indexOf(callback);
         if (pos <= 0)
             return false;
         this._events[event].splice(pos, 1);
-    };
-    AriClient.prototype.emit = function (event) {
-        var args = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            args[_i - 1] = arguments[_i];
-        }
+    }
+    emit(event, ...args) {
         if (this._events[event]) {
             this.eventName = event; // The receivers can use this.event to get the event name!
-            for (var i in this._events[event]) {
+            for (let i in this._events[event]) {
                 this._events[event][i](args);
             }
             delete this.eventName;
         }
-    };
+    }
     //*************************************************************************
     // Low level socket handling.
     //*************************************************************************
-    AriClient.prototype.connectSocket = function () {
-        var _this = this;
+    connectSocket() {
         var self = this;
         // Get hold of websocket object depending on what platform we run in...
         if (typeof window === 'undefined') {
@@ -90,35 +85,35 @@ var AriClient = (function () {
         if (!this._ws) {
             //console.log("AriClient: Opening websocket -", this.options.wsUrl);
             this._ws = new WebSocket(this.options.wsUrl);
-            this._ws.onopen = function () {
+            this._ws.onopen = () => {
                 //console.log("AriClient: websocket connected.");
-                _this.connectAri();
+                this.connectAri();
             };
-            this._ws.onmessage = function (message) {
+            this._ws.onmessage = (message) => {
                 //console.log("AriClient.wsMsg:", message.data);
-                _this.handleSocketMessage(message.data);
+                this.handleSocketMessage(message.data);
             };
-            this._ws.onerror = function () {
+            this._ws.onerror = () => {
                 console.log('Socket error... Will try to reconnect...');
                 if (self._ws) {
                     self._ws.close();
                     self._ws = null;
                 }
                 setTimeout(self.connectSocket.bind(self), self.reconnectInterval);
-                _this.disconnectAri();
+                this.disconnectAri();
             };
-            this._ws.onclose = function () {
+            this._ws.onclose = () => {
                 console.log('Socket closed... Will try to reconnect...');
                 if (self._ws) {
                     self._ws.close();
                     self._ws = null;
                 }
                 setTimeout(self.connectSocket.bind(self), self.reconnectInterval);
-                _this.disconnectAri();
+                this.disconnectAri();
             };
         }
-    };
-    AriClient.prototype.socketSend = function (msg) {
+    }
+    socketSend(msg) {
         if (!this._ws) {
             console.log("Storing message until connected...");
             this._pendingMsgs.push(msg);
@@ -131,11 +126,11 @@ var AriClient = (function () {
             //console.log("AriClient: Sending msg:", msg);
             this._ws.send(msg);
         }
-    };
+    }
     //*************************************************************************
     // Base protocol handling.
     //*************************************************************************
-    AriClient.prototype.handleSocketMessage = function (message) {
+    handleSocketMessage(message) {
         try {
             var msg = JSON.parse(message);
         }
@@ -173,8 +168,12 @@ var AriClient = (function () {
                 delete this._pendingCallbacks[msg.res];
                 //try {
                 callback(msg.err, msg.result);
+                /*} catch (e) {
+                    console.log("Uncaught exception in callback for _call!", e);
+                }*/
             }
             else {
+                // No callback provided...
             }
         }
         else {
@@ -187,8 +186,8 @@ var AriClient = (function () {
             ;
             this["_webnotify_" + cmd](msg.data);
         }
-    };
-    AriClient.prototype.call = function (cmd, data, callback) {
+    }
+    call(cmd, data, callback) {
         var msg = {};
         msg.req = this._nextReqId++;
         msg.cmd = cmd;
@@ -198,61 +197,60 @@ var AriClient = (function () {
             this._pendingCallbacks[msg.req] = callback;
         }
         this.socketSend(JSON.stringify(msg));
-    };
-    AriClient.prototype.notify = function (cmd, data) {
+    }
+    notify(cmd, data) {
         var msg = {};
         msg.cmd = cmd;
         msg.data = data;
         this.socketSend(JSON.stringify(msg));
-    };
+    }
     //*************************************************************************
     // ARI handling.
     //*************************************************************************
     //*************************************************************************
     // connect, disconnect, clientInfo
-    AriClient.prototype.connectAri = function () {
-        var _this = this;
+    connectAri() {
         if (!this.options.authToken) {
             // No authToken, so we need to request it.
-            this.call("REQAUTHTOKEN", { "name": this.clientModel.name, "role": this.options.role, "password": this.options.password }, function (err, result) {
+            this.call("REQAUTHTOKEN", { "name": this.clientModel.name, "role": this.options.role, "password": this.options.password }, (err, result) => {
                 if (err) {
                     console.log("Error:", err);
                     return;
                 }
-                _this.clientModel.name = result.name;
-                _this.options.authToken = result.authToken;
+                this.clientModel.name = result.name;
+                this.options.authToken = result.authToken;
                 // Try to connect again.
-                setTimeout(function () {
-                    _this.connectAri();
+                setTimeout(() => {
+                    this.connectAri();
                 }, 1);
             });
         }
         else {
             // We have authToken, so connect "normally".
-            this.call("CONNECT", { "name": this.clientModel.name, "authToken": this.options.authToken }, function (err, result) {
+            this.call("CONNECT", { "name": this.clientModel.name, "authToken": this.options.authToken }, (err, result) => {
                 if (err) {
                     return;
                 }
                 console.log("Connect OK!");
                 //console.log("registerClient result:", result);
-                _this.clientModel.name = result.name;
+                this.clientModel.name = result.name;
                 // Send if we have stored msg's...
-                for (var i = 0; i < _this._pendingMsgs.length; i++) {
-                    _this._ws.send(_this._pendingMsgs[i]);
+                for (var i = 0; i < this._pendingMsgs.length; i++) {
+                    this._ws.send(this._pendingMsgs[i]);
                 }
-                _this._pendingMsgs = [];
-                _this.isConnected = true;
-                _this.emit("connect", result);
+                this._pendingMsgs = [];
+                this.isConnected = true;
+                this.emit("connect", result);
             });
         }
-    };
-    AriClient.prototype.disconnectAri = function () {
+    }
+    disconnectAri() {
         this.emit("diconnect");
-    };
+    }
     // ClientInfo 
     // This function sets a timeout function, so that after 10ms the update is sent.
     // If many updates are made to clientInfo (durgin startup), only one clientInfo update will be sent to the server!
-    AriClient.prototype.sendClientInfo = function () {
+    sendClientInfo() {
         if (!this._serverupdatePending) {
             this._serverupdatePending = true; // "static" member value of member function!
             var self = this;
@@ -263,46 +261,41 @@ var AriClient = (function () {
                 //console.log("clientInfo:", self.clientModel);
             }, 10);
         }
-    };
+    }
     //*************************************************************************
     // Suppor to send logging info to server...
-    AriClient.prototype.log = function (loggerName, level) {
-        var args = [];
-        for (var _i = 2; _i < arguments.length; _i++) {
-            args[_i - 2] = arguments[_i];
-        }
+    log(loggerName, level, ...args) {
         if (this.options.loggingService)
-            (_a = this.options.loggingService).logInput.apply(_a, [loggerName, level].concat(args));
+            this.options.loggingService.logInput(loggerName, level, ...args);
         this.notify("log", args);
         console.log(loggerName, "\t", level, "\t", args);
-        var _a;
-    };
+    }
     //*************************************************************************
     // Inputs
-    AriClient.prototype.addInput = function (metadata, callback) {
+    addInput(metadata, callback) {
         metadata._callback = callback;
         this.clientModel.ins[metadata.name] = metadata;
         this.sendClientInfo();
-    };
+    }
     ;
     // Check if value has been registered.
-    AriClient.prototype.inputExists = function (name) {
+    inputExists(name) {
         if (this.clientModel.ins[name])
             return true;
         else
             return false;
-    };
+    }
     // Remove info about value and send update to server.
-    AriClient.prototype.removeInput = function (name) {
+    removeInput(name) {
         delete this.clientModel.ins[name];
         this.sendClientInfo();
-    };
+    }
     // Set remote input.
-    AriClient.prototype.setInput = function (name, value) {
+    setInput(name, value) {
         this.notify("SETINPUT", { "name": name, "value": value });
-    };
+    }
     // Remote client wants to set a local input.
-    AriClient.prototype._webnotify_INPUT = function (msg) {
+    _webnotify_INPUT(msg) {
         var name = msg.name;
         var value = msg.value;
         if (name == undefined || value == undefined)
@@ -313,33 +306,33 @@ var AriClient = (function () {
             if (inp._callback)
                 inp._callback(name, value);
         }
-    };
+    }
     //*************************************************************************
     // Outputs
-    AriClient.prototype.addOutput = function (metadata) {
+    addOutput(metadata) {
         this.clientModel.outs[metadata.name] = metadata;
         this.sendClientInfo();
         var self = this;
-        return { send: function (data) { self.sendOutput(metadata.name, data); } };
-    };
+        return { send: (data) => { self.sendOutput(metadata.name, data); } };
+    }
     ;
     // Check if value has been registered.
-    AriClient.prototype.outputExists = function (name) {
+    outputExists(name) {
         if (this.clientModel.outs[name])
             return true;
         else
             return false;
-    };
+    }
     // Remove info about value and send update to server.
-    AriClient.prototype.removeOutput = function (name) {
+    removeOutput(name) {
         delete this.clientModel.outs[name];
         this.sendClientInfo();
-    };
-    AriClient.prototype.sendOutput = function (name, data) {
+    }
+    sendOutput(name, data) {
         this.notify("OUTPUT", { name: name, data: data });
-    };
+    }
     // Server informs that a watched output changed.
-    AriClient.prototype._webcall_OUTPUT = function (msg) {
+    _webcall_OUTPUT(msg) {
         var name = msg.name;
         if (!name)
             return;
@@ -355,28 +348,28 @@ var AriClient = (function () {
                 }
             }
         }
-    };
+    }
     /**
      * Watch remote client output - call function when output changes is notified.
      * Returns reference to the function. Store this to be able to unwatch for this specific callback in case you have more than one watch/callback on same value.
      */
-    AriClient.prototype.watchOutput = function (name, callback) {
+    watchOutput(name, callback) {
         if (!this.clientModel._outWatches[name]) {
             this.clientModel._outWatches[name] = [];
             this.notify("WATCHOUTPUT", { "name": name });
         }
         this.clientModel._outWatches[name].push(callback);
         return callback;
-    };
+    }
     // Server wants to watch an output.
-    AriClient.prototype._webcall_WATCHOUTPUT = function (msg) {
+    _webcall_WATCHOUTPUT(msg) {
         this.clientModel._outWatches[msg.name] = {};
-    };
+    }
     /**
      * Provide original callback in case you have more than one callback per watch.
      * Calling unwatch without callback function will unwatch all callbacks for the value.
      */
-    AriClient.prototype.unWatchOutput = function (name, callback) {
+    unWatchOutput(name, callback) {
         if (!callback) {
             delete this.clientModel._outWatches[name];
         }
@@ -393,27 +386,27 @@ var AriClient = (function () {
             // If no other local watches on output, unwatch on server.
             this.notify("UNWATCHOUTPUT", { "name": name });
         }
-    };
+    }
     // Server wants to watch an output.
-    AriClient.prototype._webcall_UNWATCHOUTPUT = function (msg) {
+    _webcall_UNWATCHOUTPUT(msg) {
         this.clientModel._outWatches[msg.name] = {};
-    };
+    }
     //*************************************************************************
     // Functions
-    AriClient.prototype.addFunction = function (metadata, callback) {
+    addFunction(metadata, callback) {
         metadata._callback = callback;
         this.clientModel.functions[metadata.name] = metadata;
         this.sendClientInfo();
-    };
+    }
     // Call function on remote client...
-    AriClient.prototype.callFunction = function (functionName, params, callback) {
+    callFunction(functionName, params, callback) {
         this.call("CALL", { "name": functionName, "params": params }, function (err, result) {
             callback(err, result);
         });
-    };
+    }
     ;
     // Server calls function on this client...
-    AriClient.prototype._webcall_CALL = function (msg, callback) {
+    _webcall_CALL(msg, callback) {
         var rpcName = msg.name;
         if (!rpcName) {
             console.log("Error: Missing name of RPC to call! - Ignoring...");
@@ -433,10 +426,10 @@ var AriClient = (function () {
             // send result back.
             callback(err, result);
         });
-    };
+    }
     //*************************************************************************
     // Utillity functions
-    AriClient.prototype._matches = function (strA, strB) {
+    _matches(strA, strB) {
         if (strA == strB)
             return true;
         var aPos = strA.indexOf('*');
@@ -446,9 +439,7 @@ var AriClient = (function () {
                 return true;
         }
         return false;
-    };
-    return AriClient;
-}());
-Object.defineProperty(exports, "__esModule", { value: true });
+    }
+}
 exports.default = AriClient;
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/www/app/ariclient.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/www/app/ariclient.js.map

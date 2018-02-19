@@ -47,8 +47,15 @@ The message is sent as a response to a change in a value on ethe server that has
 	Can be used on input variables or output variables to get the last state sent to the server.
 
 ### CALLFUNCTION
+<<<<<<< HEAD
 kjhgfgku
 
+=======
+
+
+# TEST
+mermaid in Visual studio...
+>>>>>>> 8b2f84e94bf05b15d2ae6254258ae421849a409e
 ```mermaid
 sequenceDiagram
 Alice ->> Bob: Hello Bob, how are you?
@@ -64,13 +71,18 @@ Alice->John: Yes... John, how are you?
 
 And this will produce a flow chart:
 
+<<<<<<< HEAD
 ```mermaid  {height="500px" width="1200px"}
+=======
+```mermaid
+>>>>>>> 8b2f84e94bf05b15d2ae6254258ae421849a409e
 graph LR
 A[Square Rect] -- Link text --> B((Circle))
 A --> C(Round Rect)
 B --> D{Rhombus}
 C --> D
 ```
+<<<<<<< HEAD
 
 ```mermaid
 gantt
@@ -83,3 +95,5 @@ gantt
     Task in sec      :2014-01-12  , 12d
     another task      : 24d
 ```
+=======
+>>>>>>> 8b2f84e94bf05b15d2ae6254258ae421849a409e

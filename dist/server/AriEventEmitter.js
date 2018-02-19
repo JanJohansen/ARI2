@@ -1,8 +1,9 @@
 "use strict";
-var EventEmitter2 = require('eventemitter2').EventEmitter2;
-var AriEventEmitter = (function () {
-    function AriEventEmitter() {
-        var emitter = new EventEmitter2({
+Object.defineProperty(exports, "__esModule", { value: true });
+const eventemitter2_1 = require("eventemitter2");
+class AriEventEmitter {
+    constructor() {
+        var emitter = new eventemitter2_1.EventEmitter2({
             wildcard: true,
             delimiter: '.',
             newListener: false,
@@ -14,15 +15,12 @@ var AriEventEmitter = (function () {
     /**
      * get named instance of event emitter. Call without parameter to get default emitter.
      */
-    AriEventEmitter.getInstance = function (emitterName) {
-        if (emitterName === void 0) { emitterName = ""; }
+    static getInstance(emitterName = "") {
         if (!AriEventEmitter.instances[emitterName])
             AriEventEmitter.instances[emitterName] = new AriEventEmitter();
         return AriEventEmitter.instances[emitterName];
-    };
-    AriEventEmitter.instances = {};
-    return AriEventEmitter;
-}());
-Object.defineProperty(exports, "__esModule", { value: true });
+    }
+}
+AriEventEmitter.instances = {};
 exports.default = AriEventEmitter;
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/server/AriEventEmitter.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/AriEventEmitter.js.map

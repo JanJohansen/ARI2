@@ -1,4 +1,4 @@
-var EventEmitter2 = require('eventemitter2').EventEmitter2;
+import {EventEmitter2} from "eventemitter2";
 
 export default class AriEventEmitter {
     static instances: any = {};

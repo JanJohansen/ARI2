@@ -1,5 +1,6 @@
 "use strict";
-var loggingService_1 = require('./loggingService');
+Object.defineProperty(exports, "__esModule", { value: true });
+const loggingService_1 = require("./loggingService");
 //var WebSocketServer = require('../../').Server;
 var http = require('http');
 var express = require('express');
@@ -10,8 +11,8 @@ var app = express();
 /**
  * httpServer
  */
-var httpServer = (function () {
-    function httpServer() {
+class httpServer {
+    constructor() {
         var port = process.env.PORT || 4000;
         app.use(function (req, res, next) {
             log.trace(req.method, req.url);
@@ -22,11 +23,10 @@ var httpServer = (function () {
         app.use('/node_modules', express.static(path.resolve(__dirname, '../../node_modules')));
         log.trace("Starting httpServer..");
         this.server = http.createServer(app);
-        this.server.listen(port, function () {
-            log.info("Listening on portz " + port + ".");
+        this.server.listen(port, () => {
+            log.info(`Listening on portz ${port}.`);
         });
     }
-    return httpServer;
-}());
+}
 exports.httpServer = httpServer;
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/server/httpServer.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/httpServer.js.map

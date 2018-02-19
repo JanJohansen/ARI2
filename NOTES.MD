@@ -1,37 +1,90 @@
-
-# Server 
+# Server - non-coherent ramblings ;O)
 ## ARI Object Model
     {
-        ClientModels: {
-            Client: {
-                name:"Client",
-                description: "blah blah",
-                ins: [
-                    {name:"in1", type:"number", description:"Input 1!"}
-                ],
-                outs: [
-                    {name:"out1", type:"enum", enums: ["playing", "paused", "stopped"], description:"Input 1!"}
-                ],
-                functions: [
-                    {
-                        name:"function1", 
-                        description:"Test func!", 
-                        params:[
-                            {name:"param1", type:"number", description:"param is used when blah blah..."}
-                        ]
-                    }
-                ]
-            },
-            Client(1): {
-                name:"Client(1)"
-            }
+        services: {
+            "HueGW": { clientModel from the HueGW },
+            ...
         }
     }
 
-# Client
+# Clients
+## Model
+Client/service is modelled in the system like a "normal javascript object" model with attributes prefixed with an "_" (underscore).
+
+    var clientModel = {
+        _type: "Object",
+        _name: "HueGW",
+        _description: "Philips HUE gateway.",
+        "getConfig": {
+            _type: "Function",
+            _description: "\
+                Returns the current configuration of the HueGW \
+                @param {number} a \
+                @param {number} b \
+                @returns {number}"
+        },
+        "setConfig": {
+            _type: "Function",
+            _description: "Set current configuration of the HueGW."
+        },
+        "Lights": {
+            _type: "Object",
+            _description: "Lights group!",
+            "LivingroomTvLamp": {
+                _type: "Object",
+                _description: "Lights group!",
+                "brightness": {
+                    _type: "ioNumber",
+                    _unit: "%",
+                    _description: "Current state of the light. (1=On, 0=Off)"
+                    _value: "1"
+                }
+            }
+        },
+        "Sensors": {
+            _type: "Object",
+            _description: "Sensor group!"
+        }
+    };
+
+Now the use case could be for a client to access members swriting something like this:
+
+    HueGW.Lights.LivingroomTvLamp.brightness = 100;
+    var hueConfig = await HueGW.getConfig();
+
+
+    //----------------------
+    /*
+        function    >|list(x) ---|>
+        ioValue     >|volume ----|>
+        iValue      >|command    |
+        oValue       |      state|>
+    */
+
+EventModel
+
+    HueGW subscribes to HueGW.**
+
+    Server: HueGW.Lights.Lamp1.brightness, OUTPUT --> Output was set
+    HueGW.Lights.Lamp1.brightness, SUB -->  Send updates for this property
+    HueGW.Lights.Lamp1.brightness, UNSUB -->  Send updates for this property
+
+
+## Communication
+AriClient has methods:
+    
+    connect();
+    setClientInfo(clientInfo: ClientModel);
+    
+    set(memberPath: string, value, Any);
+    get(memberPath: string);
+    watch(memberPath: string, callback: Funtion);
+    unWatch(memberPath: string, callback: Funtion);
+    
+    call(memberPath: string, parameter: Any, callback: Funtion);
+
+
 ## Client Object Model and Proxying
-
-
 ### Usage 
     var c = new AriClientComponent(clientName, state.authToken, "device");
     c.description = "blah blah";
@@ -67,28 +120,86 @@
     }
 
 
-From NoFlo!:
-    var noflo = require("noflo");
+# Message model for ARI: 
 
-    exports.getComponent = function() {
-        var component = new noflo.Component;
-        component.description = "This component receives data on a single input\
-        port and sends the same data out to the output port";
+    ARI.BootTime = {ts:Z20180219112800123} 
+    ARI.Time = {v:"123000"} 
+    ARI.services = {v:["HueGW"], ts:Z20180219112800123} 
 
-        // Register ports and event handlers
-        component.inPorts.add('in', { datatype: 'all' }, function(event, payload) {
-            switch (event) {
-                case 'data':
-                    // Forward data when we receive it.
-                    // Note: send() will connect automatically if needed
-                    return component.outPorts.out.send(data);
-                case 'disconnect':
-                    // Disconnect output port when input port disconnects
-                    return component.outPorts.out.disconnect();
-                }
-            }
-        );
-        component.outPorts.add('out', { datatype: 'all' });
+    Service.HueGW.clientInfo = {v:"clientInfo", ts:Z20180219112800123} 
+    Service.HueGW.connected = {v:"2", ts:Z20180219112800123} 
 
-        return component; // Return new instance
-    };
+    Service.HueGW.Lights.Lamp1.brightness.out = {v:0.5, ts:Z20180219112800123} 
+    Service.HueGW.Lights.Lamp1.brightness.in = {v:0.5, ts:Z20180219112800123} 
+
+    Service.HueGW.getConfig.call = {req:123, pars:{...}} 
+    Service.HueGW.getConfig.reply = {res:123, result:{...}} 
+
+    Service.AriLogger.getLog.call = {req:123, pars:{parameterName:, startTime?, endTime?:, reolution?:}} 
+    Service.AriAliaser.getList.call = {req:123, pars:{parameterName:, startTime?, endTime?:, reolution?:}} 
+    Service.AriAliaser.setAlias.call = {req:123, pars:{x:y, z:w}} 
+
+
+```mermaid
+sequenceDiagram
+HueGW ->> AriClient: set("Kitchen.Light", "1")
+AriClient ->> AriClientServer: {cmd:"set", params:{name:"Kitchen.Light", value:"1"})
+
+HueGW ->> AriClient: await call("Services.System.reboot", {})
+AriClient ->> AriClientServer: notify("set", "Kitchen.Light", "1")
+AriClientServer ->> AriClient: wtf!
+```
+
+# Dataflow
+
+```mermaid
+sequenceDiagram
+
+participant Client1
+participant Client2
+participant Server
+participant HueGW
+
+note right of Client1: Authenticate + transfer clientInfo<br/>!! Clientinfo MUST always be sent in one chunk to guarantee deletion of old deleted properties.
+HueGW->>Server: emit clientInfo.HueGW.ClientInfo = {...}
+Server->>Server: clientList.push("HueGW"), emit clientList
+Client1->>Server: sub clientList
+Server->>Client1: emit clientList =  ["HueGW"]
+Client1->>Server: sub clientInfo.HueGW
+Server->>Client1: emit clientInfo.HueGW.ClientInfo = {...}
+
+note right of Client1: Watching properties
+Client1->>Server: sub clients.HueGW.Lights.Lamp1.brightness
+note right of Server: If(hasListeners) sub...
+Server->>HueGW: sub clients.HueGW.Lights.Lamp1.brightness
+Client2->>Server: sub clients.HueGW.Lights.Lamp1.brightness
+
+loop
+HueGW->>Server: emit clients.(HueGW.)Lights.Lamp1.brightness = 1
+Server->>Client1: emit clients.HueGW.Lights.Lamp1.brightness = 1
+Server->>Client2: emit clients.HueGW.Lights.Lamp1.brightness = 1
+end 
+
+Client2->>Server: sub clients.HueGW.Lights.Lamp1.brightness
+Client1->>Server: sub clients.HueGW.Lights.Lamp1.brightness
+note right of Server: If(!hasListeners) unsub...
+Server->>HueGW: unsub clients.HueGW.Lights.Lamp1.brightness
+
+loop
+Client1->>Server: CALL: clients.HueGW.getConfig(id:123,...)
+Server->>HueGW: CALL: clients.HueGW.getConfig(id:456,...)
+HueGW->>Server: RES: {id:456, config...}
+Server->>Client1: RES: {id:123, config...}
+end
+```
+Model on Server
+
+    clientList: [HueGW, ++]
+    clientInfo.HueGW: {description: ...}
+    
+    clientConfig.HueGW: {...}
+    
+    value.HueGW.[...]: value
+
+    function.HueGW.getConfig({req:123, pars: ...})
+    response.HueGW.getConfig({res:123, result: ...})

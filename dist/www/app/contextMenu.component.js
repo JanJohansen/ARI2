@@ -8,9 +8,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var core_1 = require('@angular/core');
-var ContextMenuComponent = (function () {
-    function ContextMenuComponent() {
+Object.defineProperty(exports, "__esModule", { value: true });
+const core_1 = require("@angular/core");
+let ContextMenuComponent = class ContextMenuComponent {
+    constructor() {
         //@Input() menuItems: any;
         this._contextMenu = [
             {
@@ -59,7 +60,7 @@ var ContextMenuComponent = (function () {
         this.visible = false;
         this.menuSelected = new core_1.EventEmitter();
     }
-    ContextMenuComponent.prototype.menuMouseUp = function (event, currentMenu, name) {
+    menuMouseUp(event, currentMenu, name) {
         console.log("MenuClicked", event, currentMenu, name);
         if (currentMenu.children) {
             this.menuPathString += name + "->";
@@ -72,8 +73,8 @@ var ContextMenuComponent = (function () {
             this.menuSelected.emit({ path: this.menuPathString, event: event, item: currentMenu });
         }
         event.stopPropagation();
-    };
-    ContextMenuComponent.prototype.onHostClick = function (event) {
+    }
+    onHostClick(event) {
         console.log("onHostClick:", event);
         if (this.visible)
             this.visible = false;
@@ -86,23 +87,32 @@ var ContextMenuComponent = (function () {
             this.visible = true;
         }
         event.stopPropagation();
-    };
-    __decorate([
-        core_1.Output(), 
-        __metadata('design:type', Object)
-    ], ContextMenuComponent.prototype, "menuSelected", void 0);
-    ContextMenuComponent = __decorate([
-        core_1.Component({
-            selector: 'jj-context-menu',
-            // Add click handler to hosting element, to detect when to show context menu.
-            host: {
-                '(document:mouseup)': 'onHostClick($event)',
-            },
-            template: "\n                <div *ngIf=\"visible\" class=\"dropdown\" style=\"display: block; position:fixed;\" [style.left]=\"pos.x\" [style.top]=\"pos.y\">\n                    <ul class=\"dropdown-menu\" role=\"menu\" aria-labelledby=\"dLabel\" style=\"display: block;\">\n                        <li class=\"dropdown-submenu\" *ngFor=\"let menu of _currentMenu\">\n                            <a tabindex=\"-1\" href=\"#\" (mouseup)=\"menuMouseUp($event, menu, menu.name)\">\n                                {{menu.name}}  \n                                <i *ngIf=\"menu.children\" class=\"fa fa-angle-right\" aria-hidden=\"true\"></i>\n                            </a>\n                        </li>\n                    </ul>\n                </div>\n            "
-        }), 
-        __metadata('design:paramtypes', [])
-    ], ContextMenuComponent);
-    return ContextMenuComponent;
-}());
+    }
+};
+__decorate([
+    core_1.Output(),
+    __metadata("design:type", Object)
+], ContextMenuComponent.prototype, "menuSelected", void 0);
+ContextMenuComponent = __decorate([
+    core_1.Component({
+        selector: 'jj-context-menu',
+        // Add click handler to hosting element, to detect when to show context menu.
+        host: {
+            '(document:mouseup)': 'onHostClick($event)',
+        },
+        template: `
+                <div *ngIf="visible" class="dropdown" style="display: block; position:fixed;" [style.left]="pos.x" [style.top]="pos.y">
+                    <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel" style="display: block;">
+                        <li class="dropdown-submenu" *ngFor="let menu of _currentMenu">
+                            <a tabindex="-1" href="#" (mouseup)="menuMouseUp($event, menu, menu.name)">
+                                {{menu.name}}  
+                                <i *ngIf="menu.children" class="fa fa-angle-right" aria-hidden="true"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            `
+    })
+], ContextMenuComponent);
 exports.ContextMenuComponent = ContextMenuComponent;
-//# sourceMappingURL=C:/Users/Jan/Desktop/ARI2_Test/dist/www/app/contextMenu.component.js.map
+//# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/www/app/contextMenu.component.js.map
