@@ -5,7 +5,7 @@ import { iClient, iClientModel } from "../common/AriInterfaces";
 import AriEventEmitter from './AriEventEmitter';
 var ariEvent = AriEventEmitter.getInstance();
 
-import { EventEmitter } from 'events';
+//import { EventEmitter } from 'events';
 import { EventEmitter2 } from 'eventemitter2';
 
 
@@ -50,7 +50,9 @@ interface iAriClients { [name: string]: iClientModel; };
 
 type callsHandlerType = (callName: string, parameters: any) => any;
 
-export default class AriClientServer extends EventEmitter {
+export default class AriClientServer {
+
+    public onMessageOut: (message: string) => void = null;
 
     private static clients: iAriClients = {};
     private static aliases: string[] = [];
@@ -61,29 +63,57 @@ export default class AriClientServer extends EventEmitter {
     private clients = AriClientServer.clients;
 
     private _callsHandler: callsHandlerType = null;
+    private eBus: EventEmitter2;
 
     constructor() {
-        super();
-        //this.ari = AriClientServer.ari;
+        this.eBus = new EventEmitter2({
+            // set this to `true` to use wildcards. It defaults to `false`.
+            wildcard: true,
+            // the delimiter used to segment namespaces, defaults to `.`.
+            delimiter: '.',
+            // set this to `true` if you want to emit the newListener event. The default value is `true`.
+            newListener: false,
+            // the maximum amount of listeners that can be assigned to an event, default 10.
+            maxListeners: 20,    // 0=No max.!
+            // show event name in memory leak message when more than maximum amount of listeners is assigned, default false
+            verboseMemoryLeak: true
+        });
+        this.eBus.onAny((evt, args) => {
+            console.log("-- server EVENT ->:", evt, "=", args);
+        });
     }
 
-    onCalls(callsHandler: callsHandlerType) {
-        this._callsHandler = callsHandler;
+    handleMessage(json) {
+        log.debug("HandleMsg:", json);
+        var msg;
+        try {
+            msg = JSON.parse(json);
+        } catch (e) {
+            log.error("Error in JSON message from server. Ignoring message.")
+        }
+
+        let cmd = msg.cmd;
+        if ("_on_" + cmd in this) this["_on_" + cmd](msg);
+        else log.error("Server trying to call unknown method:", cmd);
     }
 
-    // Call command on client.
-    _call(callName, params) {
-        if (this._callsHandler) return this._callsHandler(callName, params);
+    _on_sub(msg) {
+        var self = this;
+        this.eBus.on(msg.name, (value) => {
+            self.send({ cmd: "evt", name: this.event, val: value });
+        });
     }
 
-    // Notify client.
-    private notify(cmd: string, data: any) {
-        var msg = {
-            cmd: cmd,
-            data: data
-        };
-        this.emit("notify", msg);
+    static no__jsonReplacer(key, value) {
+        if (key.startsWith("__")) return undefined;
+        else return value;
     }
+
+    private send(msg) {
+        if (this.onMessageOut) this.onMessageOut(JSON.stringify(msg, AriClientServer.no__jsonReplacer));
+    }
+
+
 
     disconnect() {
         //IDEA!
@@ -107,32 +137,46 @@ export default class AriClientServer extends EventEmitter {
         });
     }
 
-    _webcall_CONNECT(pars) {
-        return new Promise((resolve, reject) => {
-            //{ "name": self.name, "authToken":this.authToken }
-            if (pars.authToken == 42) {
-                // TODO: Use name from authToken since this is registered with ari!
-                this.name = pars.name;
+    _on_auth(pars) {
+        if (pars.token == 42) {
+            // TODO: Use name from authToken since this is registered with ari!
+            this.name = pars.name;
 
-                if (!this.clients[this.name]) {
-                    this.clients[this.name] = {
-                        type: "object",
-                        __name: this.name,
-                        __clientServer: this,
-                        _connected: true,
-                        _authenticated: false
-                    };
+            if (!this.clients[this.name]) {
+                this.clients[this.name] = {
+                    type: "object",
+                    __name: this.name,
+                    __clientServer: this,
+                    _connected: true,
+                    _authenticated: false
+                };
+
+                // publish new clients list
+                var list = [];
+                for (var key in this.clients) {
+                    list.push(key);
                 }
-                this.clients[this.name]._connected = true;
-                this.clients[this.name].__clientServer = this;
-                resolve({ "name": pars.name, "authToken": 42 }); // No checks or now.
+                this.pub("ARI.services", list);
             }
-            else reject("Error: AuthToken invalid!");
-        });
+            this.clients[this.name]._connected = true;
+            this.clients[this.name].__clientServer = this;
+            this.send({ cmd: "authOk", name: pars.name, "token": 42 }); // No checks or now.
+        }
+        else this.send({ cmd: "authNok", name: pars.name, "token": 42 }); // No checks or now.
     }
 
     //*************************************************************************
     //
+    pub(name, value) {
+        this.eBus.emit(name, value);
+        //if (name.startsWith(".")) this.send({ cmd: "pub", name: name.substring(1), val: value });
+    }
+
+    _on_pub(msg) {
+        log.debug("_on_pub(", msg, ")");
+        this.eBus.emit(msg.name, {v:msg.val, ts: new Date().toISOString()});
+    }
+
     _webnotify_CLIENTINFO(clientInfo) {
         log.trace("_webcall_CLIENTINFO", clientInfo);
 

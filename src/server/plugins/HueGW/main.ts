@@ -7,11 +7,13 @@ export default class HueGW {
 
     constructor() {
         var self = this;
-        this.ari.on("connected", () => { self.connected() });
-        this.ari.on("disconnected", () => { self.disconnected() });
+        this.ari.sub("authenticated", () => { self.authenticated() });
+        this.ari.sub("disconnected", () => { self.disconnected() });
+
+        this.ari.sub(".ARI.BootTime", (val) => { log.debug("Server booted @", val); });
     }
 
-    async connected() {
+    authenticated() {
         //var config = await this.ari.getServiceConfig();
         //this.config["Connection.gatewayIP"] = "127.0.0.1";
 
@@ -50,7 +52,7 @@ export default class HueGW {
         this.hue.Lights.LivingroomFloorLamp.reachable = true;
     }
     
-    async disconnected(){
+    disconnected(){
         // Clean up...
     }
 }

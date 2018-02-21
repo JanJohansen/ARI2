@@ -1,4 +1,4 @@
-import { EventEmitter } from "events";
+import { EventEmitter2 } from "eventemitter2";
 import { iClient } from "./AriInterfaces";
 
 type callsHandlerType = (callName: string, parameters: any) => any;
@@ -124,10 +124,9 @@ class AriObject {
 }
 */
 
-export default class AriClient extends EventEmitter {
+export default class AriClient {
 
-    private _callsHandler: callsHandlerType = null;
-
+    public onMessageOut: (message: string) => void = null;
     private _servicemodelUpdated = false;
     private role: string;
     private userPassword: string;
@@ -137,18 +136,30 @@ export default class AriClient extends EventEmitter {
 
     private _nextReqId = 0;        // Id to use for identifying requests and corresponding response callbacks.
     private _pendingCallbacks = {};// Callbacks for pending server requests.
-    private _valueWatches = {};    // Watched values. callback= function to be calle don change of value...
     private reconnectInterval = 2000; // Interval (in mS) to wait before retrying to connect on unexpected disconnection or error. 0 = no retry!
     private authToken = null;
-    private isConnected = false;
+    private eBus: EventEmitter2;
 
     // define clientInfo object to send to server and to maintain local state.
-    // Note that members starting with "_" will NOT be sent to server! - So use this to store members with local relevance only.
+    // Note that members starting with "__" will NOT be sent to server! - So use this to store members with local relevance only.
     public serviceModel;
-    public isAriClient = true;  // Hack to allow recognition of root node.!
 
     constructor(config?: { name?: string, authToken?: string, userName?: string, userPassword?: string }) {
-        super();
+
+        this.eBus = new EventEmitter2({
+            // set this to `true` to use wildcards. It defaults to `false`.
+            wildcard: true,
+            // the delimiter used to segment namespaces, defaults to `.`.
+            delimiter: '.',
+            // set this to `true` if you want to emit the newListener event. The default value is `true`.
+            newListener: false,
+            // the maximum amount of listeners that can be assigned to an event, default 10.
+            maxListeners: 20,    // 0=No max.!
+            // show event name in memory leak message when more than maximum amount of listeners is assigned, default false
+            verboseMemoryLeak: true
+        });
+        this.eBus.onAny((evt, args)=>{console.log("-- client EVENT ->:", evt,"=", args)});
+
         this.serviceModel = this.getProxyObject();
         this.serviceModel._name = config.name;
 
@@ -160,60 +171,105 @@ export default class AriClient extends EventEmitter {
         }
     }
 
-    private async _authenticate() {
-        const self = this;
-        if (!self.authToken) {
-            if (self.role) {
-                // No authToken, so we need to request it.
-                try {
-                    var result = await self._call("REQAUTHTOKEN", { "name": self.name, "role": self.role });
-                    self.name = result.name;
-                    self.authToken = result.authToken;
-                    // reconnect, now with authToken
-                }
-                catch (e) {
-                    console.log("Error:", e);
-                    return;
-                }
-            } else if (self.userName && self.userPassword) {
-                // No authToken, so we need to request it.
-                try {
-                    let result = await self._call("REQAUTHTOKEN", { "name": self.name, "username": self.userName, "password": self.userPassword });
-                    self.name = result.name;
-                    self.authToken = result.authToken;
-                    // reconnect, not with authToken
-                } catch (e) {
-                    console.log("Error:", e);
-                    return;
-                }
-            }
+    static no__jsonReplacer(key, value) {
+        if (key.startsWith("__")) return undefined;
+        else return value;
+    }
+
+    handleMessage(json) {
+        var msg;
+        try {
+            msg = JSON.parse(json);
+        } catch (e) {
+            log.error("Error in JSON message from server. Ignoring message.")
         }
 
+        let cmd = msg.cmd;
+        if ("_on_" + cmd in this) this["_on_" + cmd](msg);
+        else console.log("Error: Server trying to call unknown method:", cmd);
+    }
+
+    sub(name, cb) {
+        this.eBus.on(name, cb);
+        // .* indicates "remote" event name
+        if (name.startsWith(".")) this.send({ cmd: "sub", name: name.substring(1) });
+    }
+
+    unsub(name, cb) {
+        this.eBus.off(name, cb);
+        // .* indicates "remote" event name
+        if (name.startsWith(".")) {
+            if (this.eBus.listeners(name).length == 0) this.send({ cmd: "unsub", name: name.substring(1) });
+        }
+    }
+    pub(name, value) {
+        this.eBus.emit(name, value);
+        if (name.startsWith(".")) this.send({ cmd: "pub", name: name.substring(1), val: value });
+    }
+
+    _on_sub(msg) {
+        var self = this;
+        this.eBus.on(msg.name, (value) => {
+            self.send({ cmd: "evt", name: this.event, val: value });
+        });
+    }
+
+    _on_pub(msg) {
+        this.eBus.emit(msg.name, msg.val);
+    }
+
+    _on_unsub(msg) {
+        var self = this;
+        this.eBus.off(msg.name, (value) => {
+            self.send({ cmd: "evt", name: this.event, val: value });
+        });
+    }
+
+    async _on_req(msg) {
+        var res = await this[name](msg.pars);
+        // FIXME!
+        this.send({cmd:"res", result: res });
+    }
+
+    private send(msg) {
+        if (this.onMessageOut) this.onMessageOut(JSON.stringify(msg, AriClient.no__jsonReplacer));
+    }
+
+    async callRemote(name, pars) {
+        var reqId = 0;
+        this.on("name" + "reply", (val) => {
+            if (val.result.reqId) {
+                var p = this._pendingCallbacks[val.result.resId];
+                delete this._pendingCallbacks[val.result.resId];
+                p[0](val.result);
+            }
+        });
+        this.emit("name" + "call", { id: reqId, pars: pars });
+        return new Promise((resolve, reject) => {
+            this._pendingCallbacks[reqId++] = [resolve, reject];
+        });
+    }
+
+
+    private _authenticate() {
+        const self = this;
         if (self.authToken) {
             // We have authToken, so connect "normally".
-            try {
-                let result = await self._call("CONNECT", { "name": self.name, "authToken": self.authToken });
-                self.name = result.name; // update local name in case server uses an indexed name for multiple instances of the same clientname e.g. "HueGW (2)"
-
-                // TBD: Send clientInfo if already defined...
-
-            } catch (e) {
-                console.log("Error:", e);
-                return;
+            this.send({ cmd: "auth", token: self.authToken, name: self.name });
+        } else {
+            if (self.role) {
+                // No authToken, so we need to request it.
+                this.send({ auth: { name: self.name, role: self.role } });
+            } else if (self.userName && self.userPassword) {
+                // No authToken, so we need to request it.
+                this.send({ auth: { name: self.name, username: self.userName, password: self.userPassword } });
             }
         }
     }
 
-    onCalls(callsHandler: callsHandlerType) {
-        this._callsHandler = callsHandler;
-    }
-
-    _call(callName, params) {
-        if (this._callsHandler) return this._callsHandler(callName, params);
-    }
-
-    _notify(name, pars) {
-        this.emit("notify", name, pars);
+    _on_authOk(msg) {
+        this.name = msg.name;
+        this.pub("authenticated");
     }
 
     private getProxyObject() {
@@ -250,7 +306,7 @@ export default class AriClient extends EventEmitter {
                         target[name] = value;
                         //console.log("Setting:", path, "=", value);
                         // TODO: Send udpated value if any subscriptions.
-                        self.emit("notify", "OUTPUT", { name: this.name + "." + path, value: value });
+                        self.pub(path + ".out", value);
                     }
                 }
                 return true;
@@ -264,9 +320,9 @@ export default class AriClient extends EventEmitter {
     // connect, disconnect --------------------------------------------------------
 
     // Normal connect with authToken.
-    async connect(authToken = null) {
-        await this._authenticate();
-        this.emit("connected");
+    connect(authToken = null) {
+        this._authenticate();
+        this.pub("connected");
     };
 
     // First time connect if only user and password is known.
@@ -304,7 +360,7 @@ export default class AriClient extends EventEmitter {
             setTimeout(function () {
                 self._servicemodelUpdated = false;
                 // send clientInfo.
-                self.emit("notify", "CLIENTINFO", self.serviceModel);
+                self.pub(".Service."+self.name+".clientInfo", self.serviceModel);
                 //console.log("clientInfo:", self.serviceModel);
             }, 10);
         }

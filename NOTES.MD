@@ -122,7 +122,11 @@ AriClient has methods:
 
 # Message model for ARI: 
 
+    ->server: {auth: {token: "jhgjhgguh"}}
+    <-server: {authOk: {name: "WebClient(1)"}}
+    
     ARI.BootTime = {ts:Z20180219112800123} 
+    {cmd:"set", pars:{name:"ARI.BootTime", val: {ts:Z20180219112800123} } }
     ARI.Time = {v:"123000"} 
     ARI.services = {v:["HueGW"], ts:Z20180219112800123} 
 
@@ -138,6 +142,13 @@ AriClient has methods:
     Service.AriLogger.getLog.call = {req:123, pars:{parameterName:, startTime?, endTime?:, reolution?:}} 
     Service.AriAliaser.getList.call = {req:123, pars:{parameterName:, startTime?, endTime?:, reolution?:}} 
     Service.AriAliaser.setAlias.call = {req:123, pars:{x:y, z:w}} 
+
+
+    {cmd:"sub", name:"Service.HueGW.Lights.Lamp1.brightness.out" }
+    {cmd:"evt", name:"Service.HueGW.Lights.Lamp1.brightness.out", val:{v:0.5, ts:Z20180219112800123} }
+    {cmd:"req", name:"Service.HueGW.getConfig.call",  data: {reqId: 123, pars: {...}} }
+    {cmd:"res", name:"Service.HueGW.getConfig.reply", data: {reqId: 123, result:{...}} } 
+
 
 
 ```mermaid

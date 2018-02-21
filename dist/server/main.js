@@ -11,9 +11,6 @@ loggingService_1.loggingService.addWriter(new loggingService_1.consoleLogWriter(
 var log = loggingService_1.loggingService.getLogger("Main");
 log.info("ARI 2.0 Starting.");
 const httpServer_1 = require("./httpServer");
-//import wsServer from './wsServer';
-//import Executor from './nodeExecutor';
-const PluginLoader_1 = require("./PluginLoader");
 const ariClientServer_1 = require("./ariClientServer");
 const AriEventEmitter_1 = require("./AriEventEmitter");
 var WebSocketServer = require('ws').Server;
@@ -90,5 +87,43 @@ server.listen(3000, () => {
 });
 //*****************************************************************************
 // Start plugins
-PluginLoader_1.default.start();
+//PluginLoader.start();
+const PubSubStore_1 = require("./PubSubStore");
+var pubsub = new PubSubStore_1.default();
+//pubsub.pub("Services.HueGW.Lights.Lamp1.brightness.out", 0.5);
+//log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
+/*
+pubsub.sub("Services.HueGW.Lights.Lamp1.brightness.out", (value, name)=>{
+    log.debug("CB:", name, "=", value);
+});
+log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
+pubsub.pub("Services.HueGW.Lights.Lamp1.brightness.out", 0.9);
+
+var cb = pubsub.sub("Services.HueGW.**", (value, name)=>{
+    log.debug("CB:", name, "=", value);
+});
+log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
+pubsub.pub("Services.HueGW.Lights.Lamp1.brightness.out", 1.0);
+
+pubsub.unsub("Services.HueGW.**", cb);
+log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
+pubsub.pub("Services.HueGW.Lights.Lamp1.brightness.out", 1.0);
+
+pubsub.pub("Services.HueGW.Lights.Lamp1.reachable.out", false);
+pubsub.setAttributes("Services.HueGW", {description: "Philips HUE gateway."});
+log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
+
+var i= 0;
+*/
+pubsub.setAttributes("HueGW", { description: "Philips HUE gateway service." });
+pubsub.setAttributes("HueGW.Lights", { description: "Group for connected light devices." });
+["Lamp1", "Lamp2"].forEach((lamp) => {
+    pubsub.setAttributes("HueGW.Lights." + lamp, { description: "HUE light device." });
+    pubsub.setAttributes("HueGW.Lights." + lamp + ".brightness", { type: "ioNumber", description: "Brightness of the light from 0.0 (fully off) to 1.0 (fully on)." });
+    pubsub.pub("HueGW.Lights." + lamp + ".brightness", 0.0);
+    pubsub.sub("HueGW.Lights." + lamp + ".brightness", () => { });
+    pubsub.setAttributes("HueGW.Lights." + lamp + ".reachable", { type: "oBoolean", description: "Indicates whether the device is connected to the gateway." });
+    pubsub.pub("HueGW.Lights." + lamp + ".reachable", false);
+});
+log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
 //# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/main.js.map
