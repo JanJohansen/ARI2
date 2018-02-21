@@ -3,7 +3,7 @@ import ReconnectingTcpConnection from "./ReconnectingTcpClient";
 import JsonSeparator from "./JsonSeparator";
 
 export default class AriTcpClient extends AriClient {
-    constructor(config?: {name: string, authToken?: string, userName?: string, userPassword?: string, port?: number, serverAddress?: string}) {
+    constructor(config?: {name: string, authToken?: string, userName?: string, userPassword?: string, port?: number, serverAddress?: string, attributes? : any}) {
         super(config);
         var self = this;
         let tcp = new ReconnectingTcpConnection(config);

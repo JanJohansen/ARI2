@@ -1,4 +1,4 @@
-import PubSubStore from "./PubSubStore";
+import PubSubStore from "../common/PubSubStore";
 
 export default class PubSubStoreClient extends PubSubStore {
     public onSend: (...args)=>void;
@@ -14,32 +14,32 @@ export default class PubSubStoreClient extends PubSubStore {
 
     // CLIENT!
     sub(name, cb) {
-        if (name.startsWith(".")) {
+        if (name.startsWith(":")) {
             var remoteName = name.subString(1);
             this.onSend("sub", remoteName);
-            return this.sub(name, cb);
+            return super.sub(name, cb);
         }
-        else this.sub(name, cb);
+        else super.sub(name, cb);
         this._checkClientInfoUpdate(); 
     }
 
     public _remote_sub(name) {
-        return this.sub(name, this.remoteSubsCB);
+        return super.sub(name, this.remoteSubsCB);
     }
 
     //-------------
     pub(name, value) {
-        this.pub(name, value);
+        super.pub(name, value);
         this._checkClientInfoUpdate(); 
     }
 
     public _remote_pub(name, value) {
-        this.pub("." + name, value);
+        this.pub(":" + name, value);
     }
 
     //-------------
     unsub(name, cb) {
-        if (name.startsWith(".")) {
+        if (name.startsWith(":")) {
             var listeners = this.getListeners(name);
             if(listeners.length == 1) {
                 // We will remove the last listener to the remote topic...
@@ -47,9 +47,9 @@ export default class PubSubStoreClient extends PubSubStore {
                 this.onSend("unsub", remoteName);
             }
 
-            this.unsub(name, cb);
+            super.unsub(name, cb);
         }
-        else this.sub(name, cb);
+        else super.unsub(name, cb);
         
         this._checkClientInfoUpdate(); 
     }

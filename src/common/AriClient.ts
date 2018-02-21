@@ -1,133 +1,13 @@
-import { EventEmitter2 } from "eventemitter2";
-import { iClient } from "./AriInterfaces";
+import PubSubStore from "../common/PubSubStore";
+import { EventEmitter } from "events";
 
 type callsHandlerType = (callName: string, parameters: any) => any;
 
-/*
-class AriInput {
-    _name: string;
-    _parent = null;
-    _type = "input";
-    _attributes: { [name: string]: string } = {};
-    _subscribed = false;
-    onChange: (name: string, value: any) => void;
-    onSet: (name: string, value: any) => void;
-}
+export default class AriClient extends EventEmitter {
 
-class AriOutput {
-    _name: string;
-    _parent = null;
-    _type = "output";
-    _attributes: { [name: string]: string } = {};
-    _value: any;
-    _subscribed = true;//false;
-
-    set value(value) {
-        this._value = value;
-        if (this._subscribed) {
-            this._notifyOutput(this._name, this._value);
-        }
-    }
-    get value() {
-        return this._value;
-    }
-
-    // Short form for accessing value!
-    set v(value) {
-        this.value = value;
-    }
-    get v() {
-        return this.value;
-    }
-
-    _notifyOutput(path: string, value: any) {
-        var p = this._parent;
-        if (p.isAriClient) {
-            p._notify("OUTPUT", { name: path, value: value });
-        } else {
-            path = p._name + "." + path;
-            p._notifyOutput(path, value);
-        }
-    }
-}
-
-class AriFunction {
-    _name: string;
-    _parent = null;
-    _type = "function";
-    _attributes: { [name: string]: string } = {};
-    onCall: (pars: any) => any;
-}
-
-class AriObject {
-    _parent: any;
-    _name: string;
-    _type = "object"
-    _members: any = {};
-    _attributes: { [name: string]: string } = {};
-
-    _notifyOutput(path: string, value: any) {
-        var p = this._parent;
-        if (p.isAriClient) {
-            p._notify("OUTPUT", { name: path, value: value });
-        } else {
-            path = p._name + "." + path;
-            p._notifyOutput(path, value);
-        }
-    }
-
-    _toJsonString() {
-        
-    }
-
-    addObject(name: string, attributes?: { [name: string]: string }): AriObject {
-        var o = new AriObject();
-        o._parent = this;
-        o._name = name;
-        o._attributes = attributes || {};
-        this._members[name] = o;
-
-        var p = this._parent;
-        while(!p.isAriClient) {p = p._parent};
-        p.sendClientInfo();
-
-        return o;
-    }
-
-    addInput(name: string, attributes?: { [name: string]: string }, callback?: (name: string, value: any) => void): AriInput {
-        var i = new AriInput();
-        i._parent = this;
-        i._name = name;
-        i._attributes = attributes || {};
-        i.onSet = callback;
-        this._members[name] = i;
-        return i;
-    }
-
-    addOutput(name: string, attributes?: { [name: string]: string }): AriOutput {
-        var o = new AriOutput();
-        o._parent = this;
-        o._name = name;
-        o._attributes = attributes || {};
-        this._members[name] = o;
-        return o;
-    }
-
-    addFunction(name: string, attributes?: { [name: string]: string }, callback?: Function): AriFunction {
-        var f = new AriFunction();
-        f._parent = this;
-        f._name = name;
-        f._attributes = attributes || {};
-        this._members[name] = f;
-        return f;
-    }
-}
-*/
-
-export default class AriClient {
-
+    private _clientInfoTimer;
     public onMessageOut: (message: string) => void = null;
-    private _servicemodelUpdated = false;
+
     private role: string;
     private userPassword: string;
     private userName: string;
@@ -138,37 +18,30 @@ export default class AriClient {
     private _pendingCallbacks = {};// Callbacks for pending server requests.
     private reconnectInterval = 2000; // Interval (in mS) to wait before retrying to connect on unexpected disconnection or error. 0 = no retry!
     private authToken = null;
-    private eBus: EventEmitter2;
 
     // define clientInfo object to send to server and to maintain local state.
     // Note that members starting with "__" will NOT be sent to server! - So use this to store members with local relevance only.
-    public serviceModel;
+    private localModel: PubSubStore;
+    private remoteModel: PubSubStore;
 
-    constructor(config?: { name?: string, authToken?: string, userName?: string, userPassword?: string }) {
-
-        this.eBus = new EventEmitter2({
-            // set this to `true` to use wildcards. It defaults to `false`.
-            wildcard: true,
-            // the delimiter used to segment namespaces, defaults to `.`.
-            delimiter: '.',
-            // set this to `true` if you want to emit the newListener event. The default value is `true`.
-            newListener: false,
-            // the maximum amount of listeners that can be assigned to an event, default 10.
-            maxListeners: 20,    // 0=No max.!
-            // show event name in memory leak message when more than maximum amount of listeners is assigned, default false
-            verboseMemoryLeak: true
-        });
-        this.eBus.onAny((evt, args)=>{console.log("-- client EVENT ->:", evt,"=", args)});
-
-        this.serviceModel = this.getProxyObject();
-        this.serviceModel._name = config.name;
+    constructor(config?: { name?: string, authToken?: string, userName?: string, userPassword?: string, attributes? : any }) {
+        super();
+        this.localModel = new PubSubStore();
+        this.remoteModel = new PubSubStore();
 
         if (config) {
             this.name = config.name || "NN_Client";
             this.authToken = config.authToken || 42;    // TODO: Implement storing authToken on disk or localstorage in browser...
             this.userName = config.userName || null;
             this.userPassword = config.userPassword || null;
+            this.localModel.setAttributes("", config.attributes);
         }
+
+        // Send all changes to server.
+        var self = this;
+        this.localModel.sub("**", (name, value) => {
+            if (self.connected) self.send({ cmd: "set", name: name, value: value });
+        });
     }
 
     static no__jsonReplacer(key, value) {
@@ -185,56 +58,99 @@ export default class AriClient {
         }
 
         let cmd = msg.cmd;
-        if ("_on_" + cmd in this) this["_on_" + cmd](msg);
+        if ("_remote_" + cmd in this) this["_remote_" + cmd](msg);
         else console.log("Error: Server trying to call unknown method:", cmd);
     }
 
+    // CLIENT!
     sub(name, cb) {
-        this.eBus.on(name, cb);
-        // .* indicates "remote" event name
-        if (name.startsWith(".")) this.send({ cmd: "sub", name: name.substring(1) });
-    }
-
-    unsub(name, cb) {
-        this.eBus.off(name, cb);
-        // .* indicates "remote" event name
         if (name.startsWith(".")) {
-            if (this.eBus.listeners(name).length == 0) this.send({ cmd: "unsub", name: name.substring(1) });
+            var localName = name.substring(1);
+            this.localModel.sub(localName, cb);
+            this._checkClientInfoUpdate();
+        }
+        else {
+            this.send({ cmd: "sub", name: name });
+            return this.remoteModel.sub(name, cb);
         }
     }
+
+    public _remote_sub(name) {
+        return this.localModel.sub(name, this.remoteSubsCB);
+    }
+
+    //-------------
     pub(name, value) {
-        this.eBus.emit(name, value);
-        if (name.startsWith(".")) this.send({ cmd: "pub", name: name.substring(1), val: value });
+        if (name.startsWith(".")) {
+            var localName = name.substring(1);
+            this.localModel.pub(localName, value);
+            this._checkClientInfoUpdate();
+        } else {
+            this.send({ cmd: "pub", name: name });
+            return this.remoteModel.pub(name, value);
+        }
     }
 
-    _on_sub(msg) {
-        var self = this;
-        this.eBus.on(msg.name, (value) => {
-            self.send({ cmd: "evt", name: this.event, val: value });
-        });
+    public _remote_pub(msg) {
+        this.remoteModel.pub(msg.name, msg.value);
     }
 
-    _on_pub(msg) {
-        this.eBus.emit(msg.name, msg.val);
+    //-------------
+    unsub(name, cb) {
+        if (name.startsWith(".")) {
+            var localName = name.substring(1);
+            this.localModel.unsub(localName, cb);
+            this._checkClientInfoUpdate();
+        }
+        else {
+            var listeners = this.remoteModel.getListeners(name);
+            if (listeners.length == 1) {
+                // We will remove the last listener to the remote topic...
+                this.send({ cmd: "unsub", name: name });
+            }
+            this.remoteModel.unsub(name, cb);
+        }
     }
 
-    _on_unsub(msg) {
-        var self = this;
-        this.eBus.off(msg.name, (value) => {
-            self.send({ cmd: "evt", name: this.event, val: value });
-        });
+    public _remote_unsub(msg) {
+        return this.remoteModel.unsub(msg.name, this.remoteSubsCB);
     }
 
-    async _on_req(msg) {
-        var res = await this[name](msg.pars);
-        // FIXME!
-        this.send({cmd:"res", result: res });
+    //-------------
+    public setAttributes(name, attributes) {
+        if (name.startsWith(".")) name = name.substring(1);
+        this.localModel.setAttributes(name, attributes);
     }
+
+    //-------------
+    private remoteSubsCB(value, name) {
+        this.send({ cmd: "pub", name: name, value: value });
+    }
+
+    private _checkClientInfoUpdate() {
+        if (this.localModel.pubSubTreeUpdated) {
+            var self = this;
+            if (!this._clientInfoTimer) {
+                this._clientInfoTimer = setTimeout(() => {
+                    self._clientInfoTimer = null;
+                    self.sendClientInfo();
+                }, 10);
+            }
+        }
+    }
+
+    sendClientInfo() {
+        this.localModel.pubSubTreeUpdated = false;
+        // Publish local pubsubtree or special message for server?
+        this.send({ cmd: "clientinfo", clientInfo: this.localModel.pubsubTree });
+    }
+
 
     private send(msg) {
         if (this.onMessageOut) this.onMessageOut(JSON.stringify(msg, AriClient.no__jsonReplacer));
     }
 
+    /*
     async callRemote(name, pars) {
         var reqId = 0;
         this.on("name" + "reply", (val) => {
@@ -248,6 +164,11 @@ export default class AriClient {
         return new Promise((resolve, reject) => {
             this._pendingCallbacks[reqId++] = [resolve, reject];
         });
+    }
+*/
+
+    public log(...args) {
+        this.send({ cmd: "log", message: args });
     }
 
 
@@ -267,54 +188,11 @@ export default class AriClient {
         }
     }
 
-    _on_authOk(msg) {
+    _remote_authOk(msg) {
         this.name = msg.name;
-        this.pub("authenticated");
+        this.connected = true;
+        this.emit("authenticated");
     }
-
-    private getProxyObject() {
-        var self = this;
-        var handler = {
-            get: (target, name, receiver) => {
-                //console.log("Getting:", name);
-                return target[name];
-            },
-            set: (target, name, value) => {
-                if (typeof (value) == "object") {
-                    value.__parent = target;
-                    value.__name = name;
-                    target[name] = new Proxy(value, handler);
-                    console.log("ServiceModel updated!");
-                    // Send updated clientmodel after ~10ms...
-                    self.sendClientInfo();
-                } else {
-                    // Determine "path" to this member
-                    var p = target.__parent;
-                    var path = target.__name + "." + name;
-                    while (p) {
-                        if (p.__name) path = p.__name + "." + path;
-                        p = p.__parent;
-                    }
-
-                    // Set .value propoerty if existing. This is a simpler way of using props. (Could be confusing though!?)
-                    if (target[name]) {
-                        if (target[name].hasOwnProperty("value")) {
-                            target[name].value = value;
-                        }
-                    }
-                    else {
-                        target[name] = value;
-                        //console.log("Setting:", path, "=", value);
-                        // TODO: Send udpated value if any subscriptions.
-                        self.pub(path + ".out", value);
-                    }
-                }
-                return true;
-            }
-        };
-        return new Proxy({ __isRoot: true }, handler);
-    }
-
 
     //*****************************************************************************
     // connect, disconnect --------------------------------------------------------
@@ -322,7 +200,7 @@ export default class AriClient {
     // Normal connect with authToken.
     connect(authToken = null) {
         this._authenticate();
-        this.pub("connected");
+        this.emit("connected");
     };
 
     // First time connect if only user and password is known.
@@ -352,19 +230,7 @@ export default class AriClient {
     // clientInfo -----------------------------------------------------------------
     // This function sets a timeout function, so that after 10ms the update is sent.
     // If many updates are made to clientInfo (durgin startup), only one clientInfo update will be sent to the server!
-    private sendClientInfo() {
-        if (!this._servicemodelUpdated) {
-            this._servicemodelUpdated = true;
 
-            var self = this;
-            setTimeout(function () {
-                self._servicemodelUpdated = false;
-                // send clientInfo.
-                self.pub(".Service."+self.name+".clientInfo", self.serviceModel);
-                //console.log("clientInfo:", self.serviceModel);
-            }, 10);
-        }
-    }
 
     // For easier update of values, call this and re-register all again.
     /*    clearValues () {

@@ -16,7 +16,7 @@ export default class AriTcpClientServer extends AriClientServer {
         socket.on("data", (data) => { jsonifier.dataIn(data); });
         jsonifier.on("jsonOut", (json) => { console.log("->Server:", json); this.handleMessage(json); });
 
-        this.onMessageOut = (message) => { console.log("<-Server:", message); socket.write(message); };
+        this.on("toClient", (message) => { console.log("<-Server:", message); socket.write(message); });
 
         socket.on("end", () => {
             // destroy and free this object!!!

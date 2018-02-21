@@ -14,6 +14,12 @@ export default class PubSubStore {
             if (!path.length) {
                 // path found.
                 obj.__subs = [cb];
+
+                // Call callback to transfer value immediately...
+                cb(name, obj);
+
+                // TODO: Call callback to transfer "higher level values" immediately in case of a * or ** subscription!...
+
             } else if (path.length == 1) {
                 if (path[0] == "*") {
                     obj.__sSubs = [cb];
@@ -24,6 +30,8 @@ export default class PubSubStore {
                 }
             }
         });
+
+        // TODO: Call callbacks to transfer value immediately...
         return cb;
     }
 
@@ -35,15 +43,15 @@ export default class PubSubStore {
                 obj.v = value;
                 obj.ts = new Date().toISOString();
                 if ("__subs" in obj) obj.__subs.forEach(cb => {
-                    cb(value, name);
+                    cb(name, value);
                 });
             } else {
                 // Check for * & ** subscriptions
                 if ("__sSubs" in obj) obj.__sSubs.forEach(cb => {
-                    cb(value, name);
+                    cb(name, value);
                 });
                 if ("__ssSubs" in obj) obj.__ssSubs.forEach(cb => {
-                    cb(value, name);
+                    cb(name, value);
                 });
 
             }
@@ -78,21 +86,28 @@ export default class PubSubStore {
         //var clb = cb;
         this._traversePath(name.split("."), this.pubsubTree, (path, obj) => {
             if (!path.length) {
-                // path found.
-                //obj._attrs = attributes;
-
                 for (var prop in attributes) {
                     obj["_" + prop] = attributes[prop];
                 }
-
                 return true;
             }
         });
         this.pubSubTreeUpdated = true;
     }
 
+    public getTopic(name): any {
+        var result = null;
+        this._traversePath(name.split("."), this.pubsubTree, (path, obj) => {
+            if (!path.length) {
+                // path found.
+                result = obj;
+            }
+        });
+        return result;
+    }
+
     // Helper functions below *************************************************
-    protected getListeners(name) {
+    public getListeners(name) {
         var listeners = [];
         this._traversePath(name.split("."), this.pubsubTree, (path, obj) => {
             if (!path.length) {
@@ -111,6 +126,10 @@ export default class PubSubStore {
         cb(path, obj);
         if (path.length > 0) {
             var name = path.shift();
+            if (!path.length && name == "") {
+                cb([], obj);
+                return;
+            } else { }
             if (!(name in obj)) {
                 obj[name] = {}; // Path doesn't exist. Create it.
                 this.pubSubTreeUpdated = true;

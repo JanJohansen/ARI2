@@ -1,58 +1,31 @@
 import AriTcpClient from "../../../common/AriTcpClient";
 
-export default class HueGW {
-
-    ari = new AriTcpClient({ name: "HueGW" });
-    hue;
+export default class HueGW extends AriTcpClient {
 
     constructor() {
-        var self = this;
-        this.ari.sub("authenticated", () => { self.authenticated() });
-        this.ari.sub("disconnected", () => { self.disconnected() });
-
-        this.ari.sub(".ARI.BootTime", (val) => { log.debug("Server booted @", val); });
+        super({ name: "HueGW", attributes: {description: "Philips HUE gateway service." }});
+        this.on("authenticated", this.setup);// FIXME: Is "bind" needed?
     }
 
-    authenticated() {
-        //var config = await this.ari.getServiceConfig();
-        //this.config["Connection.gatewayIP"] = "127.0.0.1";
+    setup(){
+        this.sub("ARI.BootTime", (name, value) => { console.log("Server booted @", value); });
 
-        var hue = this.ari.serviceModel;
-        this.hue = hue;
-        hue.getConfig = {
-            type: "function", description: "kjhkjh", __callback: (pars) => {
-                //doStuff
-            }
-        };
-        hue.Lights = { description: "Lights group." };
-        hue.Lights.LivingroomFloorLamp = { description: "Philips Hue bulb." };
-        hue.Lights.LivingroomFloorLamp.brightness = {
-            type: "iNumber", value: 0.5, description: "Brightness from 0 to 1. 0.5 = ½. Getit? :O)",
-            __onSet: (value, name) => {
+        // Define own model.
+        this.setAttributes(".Lights", { description: "Group for connected light devices." });
+        ["Lamp1", "Lamp2"].forEach((lamp) => {
+            this.setAttributes(".Lights." + lamp, { description: "HUE light device." });
 
-            },
-            __onChanged: (value, name) => {
+            this.setAttributes(".Lights." + lamp + ".brightness", { type: "ioNumber", description: "Brightness of the light from 0.0 (fully off) to 1.0 (fully on)." });
+            this.pub(".Lights." + lamp + ".brightness", 0.0);
+            this.sub(".Lights." + lamp + ".brightness", () => { });
 
-            }
-        };
-        hue.Lights.LivingroomFloorLamp.reachable = { type: "oBoolean", value: false, description: "Is the light copnnected to the gateway." };
+            this.setAttributes(".Lights." + lamp + ".reachable", { type: "oBoolean", description: "Indicates whether the device is connected to the gateway." });
+            this.pub(".Lights." + lamp + ".reachable", false);
+        });
 
-
-        console.log("--------------");
-        console.log(JSON.stringify(hue, (key, value) => {
-            if (key.startsWith("__")) return undefined;//"<removed>";
-            else return value;
-        }, 2));
-        console.log("--------------");
-        setTimeout(this.doStuffLater.bind(this), 200);
-        console.log("--------------");
-    }
-
-    doStuffLater(){
-        this.hue.Lights.LivingroomFloorLamp.reachable = true;
-    }
-    
-    disconnected(){
-        // Clean up...
+        var i = 0;
+        setInterval(() => {
+            this.pub(".counter", i++);
+        }, 5000);
     }
 }
