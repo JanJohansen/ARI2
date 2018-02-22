@@ -21,21 +21,20 @@ export default class AriClient extends EventEmitter {
 
     // define clientInfo object to send to server and to maintain local state.
     // Note that members starting with "__" will NOT be sent to server! - So use this to store members with local relevance only.
-    private localModel: PubSubStore;
-    private remoteModel: PubSubStore;
+    public localModel: PubSubStore;
+    public remoteModel: PubSubStore;
 
     constructor(config?: { name?: string, authToken?: string, userName?: string, userPassword?: string, attributes? : any }) {
         super();
         this.localModel = new PubSubStore();
         this.remoteModel = new PubSubStore();
 
-        if (config) {
-            this.name = config.name || "NN_Client";
-            this.authToken = config.authToken || 42;    // TODO: Implement storing authToken on disk or localstorage in browser...
-            this.userName = config.userName || null;
-            this.userPassword = config.userPassword || null;
-            this.localModel.setAttributes("", config.attributes);
-        }
+        config = config || {};
+        this.name = config.name || "NN_Client";
+        this.authToken = config.authToken || 42;    // TODO: Implement storing authToken on disk or localstorage in browser...
+        this.userName = config.userName || null;
+        this.userPassword = config.userPassword || null;
+        this.localModel.setAttributes("", config.attributes || {});
 
         // Send all changes to server.
         var self = this;
@@ -52,9 +51,11 @@ export default class AriClient extends EventEmitter {
     handleMessage(json) {
         var msg;
         try {
+            console.log("JSON:", json);
             msg = JSON.parse(json);
         } catch (e) {
-            log.error("Error in JSON message from server. Ignoring message.")
+            console.log("Error in JSON message from server. Ignoring message.")
+            return;
         }
 
         let cmd = msg.cmd;
@@ -174,18 +175,23 @@ export default class AriClient extends EventEmitter {
 
     private _authenticate() {
         const self = this;
+        var reqSend = false;
         if (self.authToken) {
             // We have authToken, so connect "normally".
             this.send({ cmd: "auth", token: self.authToken, name: self.name });
+            reqSend = true;
         } else {
             if (self.role) {
                 // No authToken, so we need to request it.
                 this.send({ auth: { name: self.name, role: self.role } });
+                reqSend = true;
             } else if (self.userName && self.userPassword) {
                 // No authToken, so we need to request it.
                 this.send({ auth: { name: self.name, username: self.userName, password: self.userPassword } });
+                reqSend = true;
             }
         }
+        if(!reqSend) throw("ERROR!: No authToke, Role or user credentials provided to AriClient.");
     }
 
     _remote_authOk(msg) {
@@ -199,7 +205,7 @@ export default class AriClient extends EventEmitter {
 
     // Normal connect with authToken.
     connect(authToken = null) {
-        this._authenticate();
+        this._authenticate();   
         this.emit("connected");
     };
 

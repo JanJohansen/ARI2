@@ -113,8 +113,8 @@ class IID extends AriComponent {
         super(id ? id : "IID");
         this.out1 = this.addOutput({});
         this.out1.cacheLastData = true; // Send last data to newly connected inputs.
-        this.metadata["set value"] = (v) => {
-            this._value = v;
+        this.metadata["set value"] = (value) => {
+            this._value = value;
             this.out1.send(this._value);
         };
         this.metadata["set value"] = () => {

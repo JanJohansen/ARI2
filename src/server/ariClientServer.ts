@@ -16,6 +16,7 @@ export default class AriClientServer extends EventEmitter{
     private _pendingCallbacks = {};// Callbacks for pending server requests.
 
     private _callsHandler: callsHandlerType = null;
+    private suCBFunc = this.subCB.bind(this);
 
     constructor() {
         super();
@@ -36,7 +37,7 @@ export default class AriClientServer extends EventEmitter{
     }
 
     _remote_sub(msg) {
-        AriClientServer.psStore.sub(msg.name, this.subCB.bind(this));
+        AriClientServer.psStore.sub(msg.name, this.suCBFunc);
     }
     
     subCB(name, value){
@@ -61,8 +62,9 @@ export default class AriClientServer extends EventEmitter{
     }
 
     disconnect() {
-        AriClientServer.psStore.pub("Services." + this.name + ".connected", false);
+        AriClientServer.psStore.clearSubs(this.suCBFunc);
         delete AriClientServer.psStore.getTopic("Services." + this.name).__ClientServer;
+        AriClientServer.psStore.pub("Services." + this.name + ".connected", false);
     }
 
     //*************************************************************************
@@ -89,9 +91,9 @@ export default class AriClientServer extends EventEmitter{
             
             if (!service) {
                 AriClientServer.psStore.setAttributes("Services." + this.name, {
-                    __clientServer: this,
-                    _connected: true,
-                    _authenticated: false
+                    _clientServer: this,
+                    connected: true,
+                    authenticated: false
                 });
 
                 // publish new clients list
@@ -102,9 +104,9 @@ export default class AriClientServer extends EventEmitter{
                 AriClientServer.psStore.pub("ARI.services", list);
             }
             AriClientServer.psStore.setAttributes("Services." + this.name, {
-                __clientServer: this,
-                _connected: true,
-                _authenticated: false
+                _clientServer: this,    // Added attributes will have an extra _ prefixed!!!
+                connected: true,
+                authenticated: false
             });
             this.send({ cmd: "authOk", name: pars.name, "token": 42 }); // No checks or now.
         }

@@ -160,8 +160,8 @@ export class IID extends AriComponent{
         this.out1 = this.addOutput({});
         this.out1.cacheLastData = true; // Send last data to newly connected inputs.
 
-        this.metadata["set value"] = (v: any)=> {
-            this._value = v;
+        this.metadata["set value"] = (value: any)=> {
+            this._value = value;
             this.out1.send(this._value);
         };
         this.metadata["set value"] = ():any => {

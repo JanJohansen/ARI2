@@ -14,11 +14,11 @@ const httpServer_1 = require("./httpServer");
 //import wsServer from './wsServer';
 //import Executor from './nodeExecutor';
 const PluginLoader_1 = require("./PluginLoader");
-const ariClientServer_1 = require("./ariClientServer");
 const AriEventEmitter_1 = require("./AriEventEmitter");
 var WebSocketServer = require('ws').Server;
 const net = require("net");
 const AriTcpClientServer_1 = require("./AriTcpClientServer");
+const AriWsClientServer_1 = require("./AriWsClientServer");
 //*****************************************************************************
 var ariEvents = AriEventEmitter_1.default.getInstance();
 ariEvents.onAny((event, args) => {
@@ -61,18 +61,7 @@ var wss = new WebSocketServer({ server: http.server });
 // Set up "mediator" between components.
 wss.on("connection", (ws) => {
     log.trace("Client connecting");
-    var acs = new ariClientServer_1.default();
-    ws.on("message", (msg) => {
-        log.trace("<-", msg);
-        acs.handleMessage(msg);
-    });
-    acs.on("toClient", (tlg) => {
-        log.trace("->", tlg);
-        ws.send(tlg);
-    });
-    ws.on("error", () => { acs.disconnect(); });
-    ws.on("close", () => { acs.disconnect(); });
-    // Will acs leak memmory after disconnection?
+    var awscs = new AriWsClientServer_1.default(ws);
 });
 //*****************************************************************************
 // Start TcpServer

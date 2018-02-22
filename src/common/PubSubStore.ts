@@ -16,7 +16,7 @@ export default class PubSubStore {
                 obj.__subs = [cb];
 
                 // Call callback to transfer value immediately...
-                cb(name, obj);
+                cb(name, obj.value);
 
                 // TODO: Call callback to transfer "higher level values" immediately in case of a * or ** subscription!...
 
@@ -34,13 +34,15 @@ export default class PubSubStore {
         // TODO: Call callbacks to transfer value immediately...
         return cb;
     }
+    //{ "Services": { "HueGW": { "counter": { "__subs": [ null ], "value": { "value": 3, "ts": "2018-02-22T21:51:54.220Z" }, "ts": "2018-02-22T21:51:55.322Z" } } } }
+    //{ "Services": { "HueGW": { "counter": { "__subs": [ null ], "value": 7                                               , "ts": "2018-02-22T21:52:14.221Z" } } } }
 
     public pub(name, value) {
         this._traversePath(name.split("."), this.pubsubTree, (path, obj) => {
             if (!path.length) {
                 // path found.
                 var propName = path[0];
-                obj.v = value;
+                obj.value = value;
                 obj.ts = new Date().toISOString();
                 if ("__subs" in obj) obj.__subs.forEach(cb => {
                     cb(name, value);
@@ -80,6 +82,32 @@ export default class PubSubStore {
                 }
             }
         });
+    }
+
+    // Traverse whole tree and remove all ocurrences of given callback function.
+    clearSubs(cb) {
+        this._clearSubs(cb, this.pubsubTree);
+    }
+
+    _clearSubs(cb, obj) {
+        if ("__subs" in obj) {
+            var index = obj.__subs.indexOf(cb);
+            if (index > -1) obj.__subs.splice(index, 1);
+            if (!obj.__subs.length) delete obj.__subs;
+        }
+        if ("__sSubs" in obj) {
+            var index = obj.__sSubs.indexOf(cb);
+            if (index > -1) obj.__sSubs.splice(index, 1);
+            if (!obj.__sSubs.length) delete obj.__sSubs;
+        }
+        if ("__ssSubs" in obj) {
+            var index = obj.__ssSubs.indexOf(cb);
+            if (index > -1) obj.__ssSubs.splice(index, 1);
+            if (!obj.__ssSubs.length) delete obj.__ssSubs;
+        }
+        for (var prop in obj) {
+            if(obj[prop] && typeof(obj[prop]) == "object") this._clearSubs(cb, obj[prop]);
+        }
     }
 
     public setAttributes(name, attributes) {
@@ -122,7 +150,7 @@ export default class PubSubStore {
         return listeners;
     }
 
-    protected _traversePath(path: [string], obj: object, cb: (path: [string], obj) => void) {
+    protected _traversePath(path: [string], obj: object, cb: (path: [string] | undefined[], obj) => void) {
         cb(path, obj);
         if (path.length > 0) {
             var name = path.shift();

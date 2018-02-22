@@ -19,6 +19,7 @@ import AriEventEmitter from './AriEventEmitter';
 var WebSocketServer = require('ws').Server;
 import * as net from "net";
 import AriTcpClientServer from './AriTcpClientServer';
+import AriWsClientServer from './AriWsClientServer';
 
 //*****************************************************************************
 var ariEvents: any = AriEventEmitter.getInstance();
@@ -70,22 +71,7 @@ var wss = new WebSocketServer({ server: http.server });
 // Set up "mediator" between components.
 wss.on("connection", (ws) => {
     log.trace("Client connecting");
-    var acs = new AriClientServer();
-
-    ws.on("message", (msg) => {
-        log.trace("<-", msg);
-        acs.handleMessage(msg);
-    });
-    acs.on("toClient", (tlg) => {
-        log.trace("->", tlg);
-        ws.send(tlg);
-    });
-
-    ws.on("error", () => { acs.disconnect(); });
-    ws.on("close", () => { acs.disconnect(); });
-
-    // Will acs leak memmory after disconnection?
-
+    var awscs = new AriWsClientServer(ws);
 });
 
 //*****************************************************************************

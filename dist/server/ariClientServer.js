@@ -10,6 +10,7 @@ class AriClientServer extends events_1.EventEmitter {
         this._nextReqId = 0; // Id to use for identifying requests and corresponding response callbacks.
         this._pendingCallbacks = {}; // Callbacks for pending server requests.
         this._callsHandler = null;
+        this.suCBFunc = this.subCB.bind(this);
     }
     handleMessage(json) {
         log.debug("HandleMsg:", json);
@@ -27,7 +28,7 @@ class AriClientServer extends events_1.EventEmitter {
             log.error("Server trying to call unknown method:", cmd);
     }
     _remote_sub(msg) {
-        AriClientServer.psStore.sub(msg.name, this.subCB.bind(this));
+        AriClientServer.psStore.sub(msg.name, this.suCBFunc);
     }
     subCB(name, value) {
         this.send({ cmd: "pub", name: name, value: value });
@@ -48,8 +49,9 @@ class AriClientServer extends events_1.EventEmitter {
         this.emit("toClient", JSON.stringify(msg, AriClientServer.no__jsonReplacer));
     }
     disconnect() {
-        AriClientServer.psStore.pub("Services." + this.name + ".connected", false);
+        AriClientServer.psStore.clearSubs(this.suCBFunc);
         delete AriClientServer.psStore.getTopic("Services." + this.name).__ClientServer;
+        AriClientServer.psStore.pub("Services." + this.name + ".connected", false);
     }
     //*************************************************************************
     //
@@ -72,9 +74,9 @@ class AriClientServer extends events_1.EventEmitter {
             var service = AriClientServer.psStore.getTopic("Services." + this.name);
             if (!service) {
                 AriClientServer.psStore.setAttributes("Services." + this.name, {
-                    __clientServer: this,
-                    _connected: true,
-                    _authenticated: false
+                    _clientServer: this,
+                    connected: true,
+                    authenticated: false
                 });
                 // publish new clients list
                 var list = [];
@@ -84,9 +86,9 @@ class AriClientServer extends events_1.EventEmitter {
                 AriClientServer.psStore.pub("ARI.services", list);
             }
             AriClientServer.psStore.setAttributes("Services." + this.name, {
-                __clientServer: this,
-                _connected: true,
-                _authenticated: false
+                _clientServer: this,
+                connected: true,
+                authenticated: false
             });
             this.send({ cmd: "authOk", name: pars.name, "token": 42 }); // No checks or now.
         }
