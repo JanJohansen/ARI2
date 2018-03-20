@@ -1,5 +1,5 @@
 {
-    "name": "flower",
+    "name": "FlowIt",
     "version": "0.0.0",
     "description": "Flow based programming environment for ARI 2.0",
     "homepage": "?",
@@ -11,7 +11,7 @@
     "dependencies": {},
     "devDependencies": {},
     "AriPluginInfo": {
-        "name": "Flower",
+        "name": "FlowIt",
         "version": "0.0.0",
         "description": "Flow based programming environment for ARI 2.0",
         "homepage": "?",

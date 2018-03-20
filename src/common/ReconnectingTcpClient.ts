@@ -9,6 +9,7 @@ export default class ReconnectingTcpConnection extends EventEmitter {
 
     constructor(config: {port?: number, serverAddress?: string}) {
         super();
+        if(!config) config = {};
         this.port = config.port || 3000;
         this.serverAddress = config.serverAddress || "localhost";
         this._connect();

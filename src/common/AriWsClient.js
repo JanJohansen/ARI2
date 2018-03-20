@@ -1,31 +1,40 @@
 import AriClient from "../../dist/common/AriClient";
-import { webSocket } from "rxjs/observable/dom/webSocket";
+//import { webSocket } from "rxjs/observable/dom/webSocket";
+//import { webSocket } from "ws";
 
-class AriWsClient extends AriClient {
-    
+export default class AriWsClient extends AriClient {
+
     constructor(config) {
-        console.log("AriWsClient construictor called!")
-        super(config);
-        var self = this;
+        console.log("AriWsClient constructor called!")
+        super("WSClient", config);
 
         if (typeof window !== 'undefined') { // Config for browser
-            this.url = "ws://" + window.location.host;
+            this.url = "ws://" + window.location.hostname + ":4000";    // FIXME: Use location.host and use port by server. For develop we can override port, to use webpack to serve html separately.
         } else {
-            this.url = "ws://localhost:3000/socket/";
+            this.url = "ws://localhost:4000";
         }
-        console.log("AriWsClient trying to connect to:", "ws://localhost:4000");//this.url);
-        var ws = new WebSocket("ws://localhost:4000");//this.url);
-        ws.onmessage = (msgEvt) => { self.handleMessage(msgEvt.data); };
-        this.onMessageOut = (message) => { ws.send(message); };
+        this.wsConnect();
 
-        ws.onopen = () => { 
+    }
+    wsConnect() {
+        var self = this;
+        
+        console.log("AriWsClient trying to connect to:", this.url);
+        var ws = new WebSocket(this.url);
+        ws.onmessage = (msgEvt) => { self.handleMessage(msgEvt.data); };
+        self.onMessageOut = (message) => { ws.send(message); };
+
+        ws.onopen = () => {
             console.log("AriWsClient connected!");
-            self.connect(); 
+            self.connect();
         }
-        ws.onclose = ()=>{
-            
+        ws.onclose = () => {
+            self.disconnect();
+            ws = null;
+            console.log("AriWsClient disconnected!... Will rerty connection...");
+            setTimeout(() => {
+                self.wsConnect();
+            }, 2000);
         }
     }
 }
-
-export default new AriWsClient();

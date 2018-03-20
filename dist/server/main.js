@@ -15,10 +15,12 @@ const httpServer_1 = require("./httpServer");
 //import Executor from './nodeExecutor';
 const PluginLoader_1 = require("./PluginLoader");
 const AriEventEmitter_1 = require("./AriEventEmitter");
+//import { WebSocketServer } from "ws";
 var WebSocketServer = require('ws').Server;
 const net = require("net");
 const AriTcpClientServer_1 = require("./AriTcpClientServer");
 const AriWsClientServer_1 = require("./AriWsClientServer");
+const XiaomiGW_1 = require("./XiaomiGW");
 //*****************************************************************************
 var ariEvents = AriEventEmitter_1.default.getInstance();
 ariEvents.onAny((event, args) => {
@@ -26,7 +28,7 @@ ariEvents.onAny((event, args) => {
 });
 // Log uncaught exceptions.
 process.on('uncaughtException', function (error) {
-    log.fatal(error);
+    log.fatal("!!!!!! ", error);
     // TODO: Write (synchroneously) to special crash log file...
     // The correct use of 'uncaughtException' is to perform synchronous cleanup of allocated resources 
     // (e.g. file descriptors, handles, etc) before shutting down the process. 
@@ -79,25 +81,7 @@ server.listen(3000, () => {
 //*****************************************************************************
 // Start plugins
 PluginLoader_1.default.start();
-// import PubSubStoreClient from "./PubSubStoreClient";
-// var pubsub = new PubSubStoreClient();
-// //pubsub.pub("Services.HueGW.Lights.Lamp1.brightness.out", 0.5);
-// //log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
-// pubsub.sub("Services.HueGW.Lights.Lamp1.brightness.out", (value, name)=>{
-//     log.debug("CB:", name, "=", value);    
-// });
-// log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
-// pubsub.pub("Services.HueGW.Lights.Lamp1.brightness.out", 0.9);
-// var cb = pubsub.sub("Services.HueGW.**", (value, name)=>{
-//     log.debug("CB:", name, "=", value);    
-// });
-// log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
-// pubsub.pub("Services.HueGW.Lights.Lamp1.brightness.out", 1.0);
-// pubsub.unsub("Services.HueGW.**", cb);
-// log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
-// pubsub.pub("Services.HueGW.Lights.Lamp1.brightness.out", 1.0);
-// pubsub.pub("Services.HueGW.Lights.Lamp1.reachable.out", false);
-// pubsub.setAttributes("Services.HueGW", {description: "Philips HUE gateway."});
-// log.debug("Tree:", JSON.stringify(pubsub.pubsubTree, null, 2));
-// var i= 0;
+var xiaomi = new XiaomiGW_1.default();
+// import AriTest from "../common/AriObjectModel.test";
+// var a = new AriTest();
 //# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/main.js.map

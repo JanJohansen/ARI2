@@ -1,53 +1,41 @@
 # Server - non-coherent ramblings ;O)
 ## ARI Object Model
-    {
-        services: {
-            "HueGW": { clientModel from the HueGW },
-            ...
-        }
-    }
+
+    Structure:                  Types:              Description (from type):
+    ----------------------------------------------------------------------------------------
+    services
+      HueGW                     HueGW               Philips Hue gateway service.
+        Lights                                      Lights group
+          Lamp1                 HueGWLamp           Light device
+            ins
+              brightness                            Brighness setpoint from 0-1.
+            outs
+              reachable                             Indicates whether the light is reachable by the gateway.
+      Player                    Player
+        ins
+          command                                   Enum: play, stop, play/pause, next, previous, ff, fr
+        outs
+          state                                     Enum: playing, stopped, seeking
+
+
+## Events:
+* MetaEvents generated when any listeners are added and removed
+    * addedListener
+    * removedListener
+
+* AriOutput events
+    * set: 
+        * When a value iof an output is set by the owning object.
+
+* AriObject events
+    * modelUpdated: 
+        * When an object was has a child. Eiether Input, output, function or child object.
+
 
 # Clients
 ## Model
-Client/service is modelled in the system like a "normal javascript object" model with attributes prefixed with an "_" (underscore).
 
-    var clientModel = {
-        _type: "Object",
-        _name: "HueGW",
-        _description: "Philips HUE gateway.",
-        "getConfig": {
-            _type: "Function",
-            _description: "\
-                Returns the current configuration of the HueGW \
-                @param {number} a \
-                @param {number} b \
-                @returns {number}"
-        },
-        "setConfig": {
-            _type: "Function",
-            _description: "Set current configuration of the HueGW."
-        },
-        "Lights": {
-            _type: "Object",
-            _description: "Lights group!",
-            "LivingroomTvLamp": {
-                _type: "Object",
-                _description: "Lights group!",
-                "brightness": {
-                    _type: "ioNumber",
-                    _unit: "%",
-                    _description: "Current state of the light. (1=On, 0=Off)"
-                    _value: "1"
-                }
-            }
-        },
-        "Sensors": {
-            _type: "Object",
-            _description: "Sensor group!"
-        }
-    };
-
-Now the use case could be for a client to access members swriting something like this:
+Use case could be for a client to access members swriting something like this:
 
     HueGW.Lights.LivingroomTvLamp.brightness = 100;
     var hueConfig = await HueGW.getConfig();
@@ -61,63 +49,7 @@ Now the use case could be for a client to access members swriting something like
         oValue       |      state|>
     */
 
-EventModel
-
-    HueGW subscribes to HueGW.**
-
-    Server: HueGW.Lights.Lamp1.brightness, OUTPUT --> Output was set
-    HueGW.Lights.Lamp1.brightness, SUB -->  Send updates for this property
-    HueGW.Lights.Lamp1.brightness, UNSUB -->  Send updates for this property
-
-
 ## Communication
-AriClient has methods:
-    
-    connect();
-    setClientInfo(clientInfo: ClientModel);
-    
-    set(memberPath: string, value, Any);
-    get(memberPath: string);
-    watch(memberPath: string, callback: Funtion);
-    unWatch(memberPath: string, callback: Funtion);
-    
-    call(memberPath: string, parameter: Any, callback: Funtion);
-
-
-## Client Object Model and Proxying
-### Usage 
-    var c = new AriClientComponent(clientName, state.authToken, "device");
-    c.description = "blah blah";
-
-    // Define inputs and handlers.
-    c.ins.add("in1", {type: "string", description:"Descr"}, (data) => {
-        c.outs.out1 = c.ins.in1;
-    }, (event) => {});
-    
-    c.ins.in1.on("connect" ()=>{ /* do stuff */ });
-    c.ins.in1.on("disconnect" ()=>{ /* do stuff */ });
-    
-    // Define outputs
-    c.outs.add("out1", {type: "string", description:"Descr"});
-
-    // Handle events.
-    c.on("connect", (result) => {
-    });
-
-    // Define functions and handlers.
-    c.functions.add("func1", {returntype: "string", description:"Descr", params:[{name:"param1", description:"blah"}]}, (params) => {
-        return "Always 42!";
-    };
-
-
-    class me {
-        constructor(){}
-        in1: string;
-        in1.description = "";
-        func1 () {
-
-        }
-    }
 
 
 # Message model for ARI: 

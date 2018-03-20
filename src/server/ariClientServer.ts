@@ -2,28 +2,31 @@ import { loggingService, consoleLogWriter } from './loggingService';
 var log = loggingService.getLogger("ariClientServer");
 
 import { EventEmitter } from 'events';
-import PubSubStore from "../common/PubSubStore";
+import { AriObjectModel, AriEvent } from "../common/AriObjectModel";
 
 type callsHandlerType = (callName: string, parameters: any) => any;
 
-export default class AriClientServer extends EventEmitter{
+export default class AriClientServer extends EventEmitter {
 
     private static aliases: string[] = [];
-    private static psStore = new PubSubStore();
+    private static ariRoot = new AriObjectModel(null, "AriRoot");
+    private ariRoot = AriClientServer.ariRoot;
 
     private name;
     private _nextReqId = 0;        // Id to use for identifying requests and corresponding response callbacks.
     private _pendingCallbacks = {};// Callbacks for pending server requests.
 
     private _callsHandler: callsHandlerType = null;
-    private suCBFunc = this.subCB.bind(this);
+    private subCBFunc = this.subCB.bind(this);
+    private connected = false;
 
     constructor() {
         super();
+        this.connected = true;
     }
 
     handleMessage(json) {
-        log.debug("HandleMsg:", json);
+        //log.debug("HandleMsg:", json);
         var msg;
         try {
             msg = JSON.parse(json);
@@ -37,19 +40,26 @@ export default class AriClientServer extends EventEmitter{
     }
 
     _remote_sub(msg) {
-        AriClientServer.psStore.sub(msg.name, this.suCBFunc);
-    }
-    
-    subCB(name, value){
-        this.send({cmd:"pub", name: name, value: value});
+        if(msg.name == "") this.ariRoot.on("oSet", this.subCBFunc);
+        else if (msg.name.endsWith(".**")) {
+            var name = msg.name.substring(msg.name.length - 3);
+            var obj = this.ariRoot.findPath(name, "obj");
+            obj.on("oSet", this.subCBFunc);
+        } else {
+            var obj = this.ariRoot.findPath(msg.name, "out");
+            obj.on("oSet", this.subCBFunc);
+        }
     }
 
-    _remote_pub(msg){
-        AriClientServer.psStore.pub("Services." + this.name + "." + msg.name, msg.value);
+    subCB(evt) {
+        this.send({ cmd: "oSet", name: this.ariRoot.pathToHere(evt.target), value: evt.value });
     }
 
-    _remote_set(msg) {
-        AriClientServer.psStore.pub("Services." + this.name + "." + msg.name, msg.value);
+    _remote_oSet(msg) {
+        var ariValue = this.ariRoot.findPath("Clients." + this.name + "." + msg.name, "out");
+        //if(ariValue instanceof AriInputModel) ariValue.value = msg.value;
+        ariValue.dispatchEvent(new AriEvent("oSet", { target: ariValue, value: msg.value }));
+        // else ignore!
     }
 
     static no__jsonReplacer(key, value) {
@@ -58,59 +68,45 @@ export default class AriClientServer extends EventEmitter{
     }
 
     private send(msg) {
-        this.emit("toClient", JSON.stringify(msg, AriClientServer.no__jsonReplacer));
+        if (this.connected) this.emit("toClient", JSON.stringify(msg, AriClientServer.no__jsonReplacer));
     }
 
     disconnect() {
-        AriClientServer.psStore.clearSubs(this.suCBFunc);
-        delete AriClientServer.psStore.getTopic("Services." + this.name).__ClientServer;
-        AriClientServer.psStore.pub("Services." + this.name + ".connected", false);
+        this.connected = false;
+        var ariThis = this.ariRoot.findPath("Clients." + this.name) as AriObjectModel;
+        ariThis.clearListeners("oSet", this.subCBFunc);
+        ariThis["__ClientServer"] = null;
+        ariThis["__authenticated"] = false;
+        ariThis.outs.connected.value = false;
     }
 
     //*************************************************************************
     //
-    _webcall_REQAUTHTOKEN(pars) {
-        return new Promise((resolve, reject) => {
-            //{ "name": this.name, "role": this.role, "password": this.password }
-            if (pars.password == "please") {
+    _remote_auth(msg) {
+        if (msg.token == 42) {
+            // TODO: Use name from authToken since this is registered with ari!
+            this.name = this.generateUniqueName(msg.name);
 
-                //TODO: Ensure name is unique
-                this.name = pars.name;
-                resolve({ "name": pars.name, "authToken": 42 }); // No checks or now.
-            }
-            else reject("Error: AuthToken invalid!");
-        });
+            var ariThis = this.ariRoot.findPath("Clients." + this.name, "obj") as any;
+            ariThis.__clientServer = this;
+            ariThis.__authenticated = true;
+            ariThis.addOutput("connected");
+            ariThis.outs.connected.value = true;
+
+            this.send({ cmd: "authOk", name: msg.name, "token": 42 }); // No checks for now.
+        }
+        else this.send({ cmd: "authNok", name: msg.name, "token": 42 }); // No checks for now.
     }
 
-    _remote_auth(pars) {
-        if (pars.token == 42) {
-            // TODO: Use name from authToken since this is registered with ari!
-            this.name = pars.name;
-            
-            var service = AriClientServer.psStore.getTopic("Services." + this.name);
-            
-            if (!service) {
-                AriClientServer.psStore.setAttributes("Services." + this.name, {
-                    _clientServer: this,
-                    connected: true,
-                    authenticated: false
-                });
-
-                // publish new clients list
-                var list = [];
-                for (var key in AriClientServer.psStore.getTopic("Services")) {
-                    list.push(key);
-                }
-                AriClientServer.psStore.pub("ARI.services", list);
-            }
-            AriClientServer.psStore.setAttributes("Services." + this.name, {
-                _clientServer: this,    // Added attributes will have an extra _ prefixed!!!
-                connected: true,
-                authenticated: false
-            });
-            this.send({ cmd: "authOk", name: pars.name, "token": 42 }); // No checks or now.
+    generateUniqueName(name) {
+        var newName = name;
+        var idx = 1;
+        var services = this.ariRoot.findPath("Clients", "obj");
+        while (newName in services && (services[newName] instanceof AriObjectModel)) {
+            newName = name + "(" + idx.toString() + ")";
+            idx++;
         }
-        else this.send({ cmd: "authNok", name: pars.name, "token": 42 }); // No checks or now.
+        return newName;
     }
 
     //*************************************************************************
@@ -122,15 +118,12 @@ export default class AriClientServer extends EventEmitter{
         // log.debug("New clientInfo from", clientName, ":", JSON.stringify(clientInfo, null, "\t"));
 
         // Merge client info with present info... Remove values, functions, etc. not in Info from client.
-        var clientModel = AriClientServer.psStore.getTopic("Services." + this.name);
+        var clientModel = this.ariRoot.findPath("Services." + this.name, "obj");
 
-        this.deleteRemoved(clientModel, clientInfo);
-
-        // Perform deep merge from remote clientInfo to local clientModel.
-        this.deepMerge(clientModel, clientInfo);
+        //clientModel.updateModel(clientInfo);
 
         // Make sure name is the one used in token!. (E.g. given name from server and not the default name from client.)
-        clientModel.name = this.name;
+        //        clientModel.name = this.name;
     }
 
     // Delete object members of target that are not in model. Leave all value members. Ignore "__" double underscored members.
@@ -159,8 +152,8 @@ export default class AriClientServer extends EventEmitter{
         return target;
     };
 
- 
 
+    //*************************************************************************
     // Find alias. Return name for alias if found. Return same name if not found.
     resolveAlias(alias) {
         return AriClientServer.aliases[alias] || alias;

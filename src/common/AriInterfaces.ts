@@ -9,7 +9,7 @@ value   = value may     be transmitted to and     received from clients/services
 
 export interface iObject {
     //_type: "iObject" | "oObject" | "ioObject" | "object";
-    __name: string;
+    name: string;
     description?: string;
 
     //[name: string]: iMembers | iFunction | iValue;
@@ -21,15 +21,15 @@ interface iMembers {
 export type iAriObjectModel = iObject & iMembers;
 
 export interface iFunction {
-    __name: string;
+    name: string;
     __callback?: (any)=>any;
     type: "function";
     description?: string;
 }
 
 export interface iValue {
-    __name: string;
-    _timeStamp?: Date;
+    name: string;
+    ts?: Date;
     type: 
         "iNumber" | "oNumber" | "ioNumber" |
 	    "iString" | "oString" | "ioString" |
@@ -54,4 +54,7 @@ export interface iClient {
 }
 
 export type iClientModel = iClient & iNonAriMembers ;
+
+
+
 
