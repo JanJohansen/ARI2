@@ -1,39 +1,30 @@
 
-export class AriEvent {
-    eventName: string;
-    target?: AriModelBase;
+export interface AriEvent {
+    evt: string;
+    source?: AriNode;
+    target?: AriNode;
     value?: any;
-    addedEventName?: string;
-    removedEventName?: string;
-
-    constructor(name: string, eventInitDict: any = null) {
-        if (eventInitDict) {
-            for (let prop in eventInitDict) {
-                this[prop] = eventInitDict[prop];
-            }
-        }
-        this.eventName = name;
-    }
-}
-class AriCustomEvent extends AriEvent {
-    constructor(customEventName: string, eventInitDict: any = null) {
-        super("customEvent", { customEventName: customEventName, details: eventInitDict });
-    }
 }
 
 //-----------------------------------------------------------------------------
-export class AriModelBase {
+export class AriNode {
     public static typeInfos: { [name: string]: any } = {};
 
     public name: string;
-    public type: string;
-    protected __parent: AriModelBase;
+    public type?: string;
+    public value?: any;
+    protected __parent: AriNode;
     private __events: { [name: string]: Set<(event: AriEvent) => void> } = {};
 
-    public constructor(parent: AriObjectModel, name: string = undefined, type: string = undefined) {
+    public constructor(parent: AriNode, name: string = undefined, type: string = undefined) {
         this.__parent = parent;
         this.name = name;
         this.type = type;
+    }
+    addChild(name: string = undefined, type: string = undefined) {
+        this[name] = new AriNode(this, name, type);
+        this[name].emit({ evt: "modelUpdated" });
+        return this[name];
     }
     get path() {
         var path = this.name;
@@ -44,8 +35,8 @@ export class AriModelBase {
         }
         return path;
     }
-    pathToHere(source){
-        if(source == this) return "";
+    pathToHere(source) {
+        if (source == this) return "";
         var path = source.name;
         var p = source.__parent;
         while (p && p != this) {
@@ -54,41 +45,65 @@ export class AriModelBase {
         }
         return path;
     }
-    // Event bubbling and handling
+    // Event handling
     on(eventName: string, cb: (event: AriEvent) => void) {
         if (!(eventName in this.__events)) this.__events[eventName] = new Set();
         this.__events[eventName].add(cb);
-        
-        this.dispatchEvent(new AriEvent("addedListener", {addedEventName: eventName, target: this, }));
+
+        this.emit({ evt: "addedListener", value: eventName });
     }
     off(eventName: string, cb: (event: AriEvent) => void) {
         this.__events[eventName].delete(cb);
-        this.dispatchEvent(new AriEvent("removedListener", {removedEventName: eventName, target: this, }));
+        this.emit({ evt: "removedListener", value: eventName });
     }
-    dispatchEvent(event: AriEvent) {
-        if (event.eventName in this.__events) this.__events[event.eventName].forEach((cb) => {
+    emit(event: AriEvent) {
+        event.source = this;
+        this.bubbleEvent(event);
+    }
+    inject(event: AriEvent) {
+        event.target = this;
+        this.bubbleEvent(event);
+    }
+    private bubbleEvent(event: AriEvent) {
+        if (event.evt in this.__events) this.__events[event.evt].forEach((cb) => {
             cb(event);
         });
         if ("*" in this.__events) this.__events["*"].forEach((cb) => {
             cb(event);
         });
-        if (this.__parent) this.__parent.dispatchEvent(event);
+        if (this.__parent) this.__parent.bubbleEvent(event);
+    }
+    getOldestEvents(events: Map<string, AriNode> = null): Map<string, AriNode> {
+        if (!events) events = new Map<string, AriNode>();
+        if (this.__events) {
+            for (var eventName in this.__events) {
+                if (this.__events[eventName] && this.__events[eventName].size > 0) {
+                    if (!events.has(eventName)) events.set(eventName, this);
+                }
+            }
+        }
+        for (var prop in this) {
+            if (this[prop] instanceof AriNode) {
+                if (this[prop] as any != this.__parent) this[prop].getOldestEvents(events);
+            }
+        }
+        return events;
     }
     /**
      * Get opbjects that are subscribing to specific eventNames.
      * @param eventName The event name to search for.
      * @param traverse If true, itterate through child objects to collect all subscribing objects.
      */
-    getListeners(eventName: string, traverse = false, listeners = new Set<AriModelBase>()): Set<AriModelBase>  {
+    getListeners(eventName: string, traverse = false, listeners = new Set<AriNode>()): Set<AriNode> {
         if (this.__events) {
-            if(this.__events[eventName] && this.__events[eventName].size > 0) {
+            if (this.__events[eventName] && this.__events[eventName].size > 0) {
                 listeners.add(this);
             }
         }
         if (traverse) {
             for (var prop in this) {
                 if (this[prop] as any != this.__parent) {
-                    if(this[prop] instanceof AriModelBase) this[prop].getListeners(eventName, traverse, listeners);
+                    if (this[prop] instanceof AriNode) this[prop].getListeners(eventName, traverse, listeners);
                 }
             }
         }
@@ -103,7 +118,31 @@ export class AriModelBase {
             }
         }
     }
-    updateModel(model) {
+    find(path: string): AriNode {
+        if (path == "") return this;
+        var parts = path.split(".");
+        var o = this;
+        while (o && parts.length) {
+            var prop = parts.shift();
+            if (!(prop in o)) return undefined;
+            o = o[prop];
+        }
+        return o;
+    }
+    findOrCreate(path: string): AriNode {
+        if (path == "") return this;
+        var parts = path.split(".");
+        var o = this;
+        while (o && parts.length) {
+            var prop = parts.shift();
+            if (!(prop in o)) {
+                o[prop] = o.addChild(prop);
+            }
+            o = o[prop];
+        }
+        return o;
+    }
+    /*updateModel(model) {
         // Delete deleted
         for (let prop in this) {
             if (!prop.startsWith("__")) {
@@ -126,17 +165,17 @@ export class AriModelBase {
                 }
             }
         }
-    }
-    typeInfo(name: string, typeInfo: any) {
-        AriModelBase.typeInfos[name] = typeInfo;
-        this.dispatchEvent(new AriEvent("typeInfo", { target: this, name: name, trypeInfo: typeInfo }));
-    }
+    }*/
 }
 
-interface AnyMembers{
+class AriGroupModel extends AriNode {
+
+};
+
+interface AnyMembers {
     [name: string]: any;
 }
-export class AriObjectModel extends AriModelBase implements AnyMembers {
+export class AriObjectModel extends AriNode implements AnyMembers {
     ins?: { [name: string]: AriInputModel };
     outs?: { [name: string]: AriOutputModel };
     functions?: { [name: string]: AriFunctionModel };
@@ -144,54 +183,56 @@ export class AriObjectModel extends AriModelBase implements AnyMembers {
     public constructor(parent: AriObjectModel, name: string, type: string = undefined) {
         super(parent, name, type);
     }
-    public addObject(name: string, type: string): AriObjectModel {
-        this[name] = new AriObjectModel(this, name, type);
-        this.dispatchEvent(new AriEvent("modelUpdated", { change: "AddChild", target: this, childName: name }));
+    public addObject(name: string, type: string = undefined): AriObjectModel {
+        this[name] = new AriObjectModel(this, name, type) as any;
+        this[name].emit({ evt: "modelUpdated", value: "AddObject" });
         return this[name];
     }
-    addInput(name: string, cb: (name: string, value: any) => void):  AriInputModel {
-        if (!this.hasOwnProperty("ins")) this.ins = this.addObject("ins", undefined) as any;
+    addInput(name: string, cb: (name: string, value: any) => void): AriInputModel {
+        if (!this.hasOwnProperty("ins")) this.ins = new AriGroupModel(this, "ins") as any;
         this.ins[name] = new AriInputModel(this.ins as any, name, cb);
-        this.dispatchEvent(new AriEvent("modelUpdated", { change: "AddInput", target: this, inputName: name }));
+        this.ins[name].emit({ evt: "modelUpdated", value: "AddInput" });
         return this.ins[name];
     }
-    addOutput(name: string, value: any = undefined):  AriOutputModel {
-        if (!this.hasOwnProperty("outs")) this.outs = this.addObject("outs", undefined) as any;
+    addOutput(name: string, value: any = undefined): AriOutputModel {
+        if (!this.hasOwnProperty("outs")) this.outs = new AriGroupModel(this, "outs") as any;
         this.outs[name] = new AriOutputModel(this.outs as any, name, value);
-        this.dispatchEvent(new AriEvent("modelUpdated", { change: "AddOutput", target: this, outputName: name }));
+        this.outs[name].emit({ evt: "modelUpdated", value: "AddOutput" });
         return this.outs[name];
     }
     addFunction(name: string, cb: (name: string, args: any) => any): AriFunctionModel {
-        if (!this.hasOwnProperty("functions")) this.functions = this.addObject("functions", undefined) as any;
+        if (!this.hasOwnProperty("functions")) this.functions = new AriGroupModel(this, "functions") as any;
         this.functions[name] = new AriFunctionModel(this.functions as any, name, cb);
-        this.dispatchEvent(new AriEvent("modelUpdated", { change: "AddFunction", target: this, functionName: name }));
+        this.functions[name].emit({ evt: "modelUpdated", value: "AddFunction" });
         return this.functions[name];
     }
     /**
      * 
      * @param path Path to destination
-     * @param createIfNotExist string "in", "out" or "obj" of the last object to create.
+     * @param createIfNotExist string "in", "out" "function" or "obj" of the last object to create.
      */
-    findPath(path: string, createIfNotExist: string = null): AriModelBase {
+    /*findPath(path: string, createIfNotExist: string = null): AriNode {
         var parts = path.split(".");
         var o = this;
         while (o && parts.length) {
             var prop = parts.shift();
             if (createIfNotExist && (!(prop in o))) {
-                if(parts.length == 0){
-                    if(createIfNotExist == "in") o[prop] = new AriInputModel(o as AriObjectModel, prop, null);
-                    else if(createIfNotExist == "out") o[prop] = new AriOutputModel(o as AriObjectModel, prop);
-                    else if(createIfNotExist == "obj") o[prop] = new AriObjectModel(o as AriObjectModel, prop);
+                if (parts.length == 0) {
+                    if (createIfNotExist == "in") o[prop] = new AriInputModel(o as AriObjectModel, prop, null);
+                    else if (createIfNotExist == "out") o[prop] = new AriOutputModel(o as AriObjectModel, prop);
+                    else if (createIfNotExist == "obj") o[prop] = new AriObjectModel(o as AriObjectModel, prop);
+                    else if (createIfNotExist == "function") o[prop] = new AriFunctionModel(o as AriObjectModel, prop, null);
+                    AriFunctionModel
                 } else o[prop] = new AriObjectModel(o as AriObjectModel, prop);
                 this.dispatchEvent(new AriEvent("modelUpdated", { target: this }));
             }
             o = o[prop];
         }
         return o;
-    }
+    }*/
 }
 
-export class AriInputModel extends AriModelBase {
+export class AriInputModel extends AriNode {
     private __value: any;
     private __cb;
 
@@ -200,17 +241,16 @@ export class AriInputModel extends AriModelBase {
         this.__parent = parent;
         this.__cb = onSet;
         var self = this;
-        this.on("setI", (evt) => { self.__cb(evt.target.name, evt.value); });
+        this.on("set", (evt) => { self.__cb(evt.target.name, evt.value); });
     }
     set value(value) {
         this.__value = value;
-        this.dispatchEvent(new AriEvent("setI", { target: this, value: value }));
     }
     get value() {
         return this.__value;
     }
 }
-export class AriOutputModel extends AriModelBase {
+export class AriOutputModel extends AriNode {
     private __value: any;
 
     public constructor(parent: AriObjectModel, name: string, value: any = undefined) {
@@ -218,24 +258,24 @@ export class AriOutputModel extends AriModelBase {
         this.__value = value;
     }
     set value(value) {
-        this.__value = value;
-        this.dispatchEvent(new AriEvent("oSet", { target: this, value: value }));
+        this.v = value;
     }
     get value() {
         return this.__value;
     }
     set v(value) {
         this.__value = value;
+        this.emit({ evt: "out", value: value });
     }
     get v() {
         return this.__value;
     }
 }
 
-export class AriFunctionModel extends AriModelBase {
+export class AriFunctionModel extends AriNode {
     private callback: any;
 
-    public constructor(parent: AriObjectModel, name: string, callback: (name: string, args: any) => any) {
+    public constructor(parent: AriGroupModel, name: string, callback: (name: string, args: any) => any) {
         super(parent, name);
         this.callback = callback;
     }
@@ -243,4 +283,3 @@ export class AriFunctionModel extends AriModelBase {
         return await this.callback(args);
     }
 }
-

@@ -84,7 +84,7 @@
 
 <script>
 export default {
-  name: "flowit-node",
+  name: "flow-node",
   props: ["node", "newconnection"],
   data() {
     return {

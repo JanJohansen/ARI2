@@ -11,7 +11,7 @@ import AriClient from "./AriClient"
 
 import LoginPage from "./loginPage"
 import DebugView from "./debug-view"
-import FlowitPage from "./Flowit"
+import FlowPage from "./Flow"
 
 Vue.use(VueRouter);
 Vue.use(BootstrapVue);
@@ -24,13 +24,16 @@ const router = new VueRouter({
   routes: [
     { path: '/', component: DebugView },
     { path: '/login', component: LoginPage },
-    { path: '/flow', component: FlowitPage },
+    { path: '/flow', component: FlowPage },
     //{ path: '/bar', component: Bar }
   ]
 })
 
+var singleSourceOfTruth = {};
+
 new Vue({
   router,
   el: '#app',
-  render: h => h(App)
+  render: h => h(App),
+  data: singleSourceOfTruth // this can be accesses as $root.$data by all child components.
 })

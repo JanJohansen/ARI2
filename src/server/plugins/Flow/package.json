@@ -1,17 +1,17 @@
 {
-    "name": "FlowIt",
+    "name": "Flow",
     "version": "0.0.0",
     "description": "Flow based programming environment for ARI 2.0",
     "homepage": "?",
     "author": {
         "name": "Jan Johansen",
-        "email": ""
+        "email": "ari@johansenweb.dk"
     },
     "main": "index.js",
     "dependencies": {},
     "devDependencies": {},
     "AriPluginInfo": {
-        "name": "FlowIt",
+        "name": "Flow",
         "version": "0.0.0",
         "description": "Flow based programming environment for ARI 2.0",
         "homepage": "?",

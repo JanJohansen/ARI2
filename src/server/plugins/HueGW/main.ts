@@ -47,6 +47,7 @@ export default class HueGW {
 
         var Lights = hueGW.addObject("Lights", "HueGWLights");
         ["Lamp1", "Lamp2"].forEach((lamp) => {
+
             var lampModel = Lights.addObject(lamp, "HueGWLamp");
             var brightness = lampModel.addInput("brightness", (value) => {
                 console.log("SET", value);
@@ -59,49 +60,29 @@ export default class HueGW {
         console.log(JSON.stringify(hueGW, (key, value) => { return key.startsWith("__") ? undefined : value }, 2));
 
 
-        var counter = hueGW.addOutput("counter", 0);
+        var counter = hueGW.addOutput("HueGWCounter", 0);
         setInterval(() => {
             counter.value++;
-        }, 1000);
+        }, 2000);
 
 
         // Interact with remote model.
-        client.remoteModel.findPath("ARI.bootTime", "out").on("oSet", (evt)=>{ console.log("Server booted @", evt.target["value"]); });
+        client.sub("outs.bootTime", (name, value)=>{console.log("Server booted @", value);});
+/*        client.on("out", "bootTime", (name, value)=>{console.log("Server booted @", value);});
+        
+        var server: any;
+        server.set("Clients.HueGW.Lights.Lamp1.ins.brightness", 0.5);
+        server.emit("set", "Clients.HueGW.Lights.Lamp1.ins.brightness", 0.5);
 
-/*
-        this.model("Lights", { description: "Group for paired light devices." });
-        ["Lamp1", "Lamp2"].forEach((lamp) => {
-            this.model("Lights." + lamp, { description: "HUE light device." });
-            this.model("Lights." + lamp + ".brightness", {
-                type: "ioNumber",
-                description: "Brightness of the light from 0.0 (fully off) to 1.0 (fully on).",
-                value: 1.0,
-                onSet: (name, value) => {
+        server.sub("outs.bootTime", (n,v)=>{blink();});
+        server.on("out", "outs.bootTime", "blink", (n,v)=>{blink();});
+        
+        server.call("Clients.HueGW.functions.getConfig", (result)=>{
 
-                },
-                onChange: (name, value) => {
-
-                }
-            });
-
-            this.model("Lights." + lamp + ".reachable", {
-                type: "oBoolean",
-                description: "Indicates whether the device is connected to the gateway.",
-                value: false
-            });
         });
 
-        this.setLocal("Lights.Lamp1.brightness", 0.5);
-        console.log(JSON.stringify(this.localModel, (key, value) => { return key.startsWith("__") && typeof (value) == "object" ? "<hidden>" : value }, 2));
-
-
-        var counter = 0;
-        this.model("counter", { type: "oNumber", value: 0 });
-        setInterval(() => {
-            this.setLocal("counter", counter++);
-        }, 5000);
-
-        this.sub("ARI.BootTime", (name, value) => { console.log("Server booted @", value); });
-    */
+        server.emit("flash", "Clients.Flow", null);
+        flow.on("flash", (n,v)=>{});
+*/
     }
 }

@@ -43,7 +43,7 @@
     "watch_app": "webpack --watch --progress",
     "watch_browsersync": "browser-sync start --config bs-config.js",
     "watch_typescript": "tsc -w",
-    "dev": "concurrently \"npm run watch_typescript\" \"npm run watch_copy_app\" \"npm run watch_browsersync\"",
+    "dev": "concurrently \"npm run watch_typescript\" \"npm run watch_copy_app\" \"npm run watch_browsersync\" \"cross-env NODE_ENV=development webpack-dev-server --open --hot\"",
     "start": "nodemon --inspect ./dist/server/main.js"
   },
   "nodemonConfig": {

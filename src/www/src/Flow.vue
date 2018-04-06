@@ -4,8 +4,11 @@
     >
         <!-- FIXME: embed contextmenu and mousedown in context-meny element-->
         <context-menu ref="contextmenu">
-            Actions:
-            <flow-tree-menu :item="contextMenu"></flow-tree-menu>
+            <flow-tree-menu-item 
+                :items="contextMenu.subMenu" 
+                ref="rootMenu"
+                @menuSelected="contextmenuSelected"
+            />
         </context-menu>
         <svg
             class="svgCanvas"
@@ -15,8 +18,7 @@
             tabindex='1'
             preserveAspectRatio="xMinYMin meet"
             @mousedown.left="mouseDown($event); $refs.contextmenu.close();"
-            @click.right.prevent.stop="$refs.contextmenu.open"
-
+            @click.right.prevent.stop="$refs.contextmenu.open($event); $refs.rootMenu.selectedItem = null;"
         >
             <flow-node 
                 v-for="(value, name) in nodes" :key="name" 
@@ -48,9 +50,11 @@ import FlowConnection from "./FlowConnection";
 import FlowDragConnection from "./FlowDragConnection";
 import ContextMenu from "./ContextMenu";
 import FlowTreeMenu from "./FlowTreeMenu";
+import FlowTreeMenuItem from "./FlowTreeMenuItem";
+
 
 export default {
-    name: "flowit-page",
+    name: "flow-page",
     data() {
         return {
             nodes: {
@@ -110,21 +114,39 @@ export default {
             dragging: false,
             dragstart: null,
             contextMenu: {
-                text: "Add", 
-                subMenu: 
-                [
+                root: true,
+                subMenu: [
                     {
-                        text: "Logic",
-                        subMenu: [
-                            { text: "AND" },
-                            { text: "OR" },
-                            { text: "NOT" }
-                        ]
-                    },
-                    {
-                        text: "Math",
-                        subMenu: [
-                            { text: "Add" }
+                        text: "Add function", 
+                        subMenu: 
+                        [
+                            {
+                                text: "Logic",
+                                subMenu: [
+                                    { text: "AND" },
+                                    { text: "OR" },
+                                    { text: "NOT" }
+                                ]
+                            },
+                            {
+                                text: "Math",
+                                subMenu: [
+                                    { text: "Add" }
+                                ]
+                            },
+                            {
+                                text: "Timing",
+                                subMenu: [
+                                    { text: "Ticker" },
+                                    { text: "Delay" },
+                                ]
+                            },
+                            {
+                                text: "System",
+                                subMenu: [
+                                    { text: "Execute" }
+                                ]
+                            }
                         ]
                     }
                 ]
@@ -136,9 +158,25 @@ export default {
         FlowConnection,
         FlowDragConnection,
         ContextMenu,
-        FlowTreeMenu
+        FlowTreeMenu,
+        FlowTreeMenuItem
     },
-    created() {},
+    created() {
+        var self = this;
+        this.$ari.on("ready", x=>{ // FIXME: How to handle if ari already connected?
+            var nti = self.$ari.call("Clients.Flow.getNodeTypeInfo").then(nti=>{
+                console.log("SUCCESS!!!! - Got nodeTypeInfo:", nti);
+            }, err=>{
+                console.log("ERROR in call getNodeTypeInfo!!!!", err);
+            });
+            var out = this.$ari.localModel.addOutput("WebFlowCounter", 41);
+            out.v += 1;
+            setTimeout(() => {
+                out.v += 1;
+            }, 2000);
+            
+        });
+    },
     computed: {
         viewBox(){
             return this.vBox.x + " " + this.vBox.y + " " + this.vBox.w + " " + 10;//this.vBox.h;//"0 0 900 500";
@@ -203,6 +241,9 @@ export default {
 
             var dy = (m.y - y) / h;
             this.vBox.y += dy * factor * h;
+        },
+        contextmenuSelected(evt){
+            console.log("MENU!!!!:", evt);
         }
     }
 };

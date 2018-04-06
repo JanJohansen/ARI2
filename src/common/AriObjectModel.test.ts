@@ -12,10 +12,10 @@ export default class AriTest {
         var childObject = ari.addObject("ChildObject", "ChildType");
         //console.log(JSON.stringify(ari, (key, value) => { return key.startsWith("__") ? undefined : value; }, 2));
         
-        childObject.on("oSet", this.debugEvt.bind(this));
+        childObject.on("out", this.debugEvt.bind(this));
         var childValue = childObject.addOutput("out1");
         childObject.outs.out1.value = 1;
-        this.assert(this.lastEvent.eventName == "oSet", "Root to receive 'set' event!");
+        this.assert(this.lastEvent.eventName == "out", "Root to receive 'set' event!");
         this.assert(this.lastEvent.target == childValue, "Event has correct target.");
         this.assert(this.lastEvent.target.value == 1, "Event has correct target.value.");
 

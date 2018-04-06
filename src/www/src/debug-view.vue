@@ -1,10 +1,13 @@
 <template>
   <div>
-    <h1>ARI model: {{ test.test.time }}</h1>
-    <textarea rows="10" cols="80" v-model="jsonString">
+    <h1>ARI model:</h1>
+    <textarea rows="10" cols="80" v-model="test">
     </textarea>
+    <button @click="get()" >Click me!</button>
     <br>
-    <json-tree-row name="ARI" :prop=remoteModel :level="0"></json-tree-row>
+    <b-card header="ARI model" no-body border-variant="secondary" style="display: inline-block;">
+      <json-tree-row name="ARI" :prop=remoteModel :level="0"></json-tree-row>
+    </b-card>
   </div>
 </template>
 
@@ -13,52 +16,82 @@ import JsonTreeRow from "./JsonTreeRow";
 
 export default {
   name: "debug-view",
+  components: {
+    JsonTreeRow
+  },
   data() {
     return {
       test: {},
       remoteModel: {}
     };
   },
-  computed: {
-    jsonString(){
-      return JSON.stringify(this.remoteModel, (prop, val)=>{
-          return prop.startsWith('__') ? undefined : val
-        }, 2);
+  methods: {
+    get: function() {
+      this.$ari.call("Services.Flow.get42", null).then(
+        val => {
+          this.test = val;
+        },
+        err => {
+          this.test = err;
+        }
+      );
+    },
+    deepMerge(source, target) {
+      for (var prop in source) {
+        if (!prop.startsWith("__")){
+          if (typeof source[prop] === "object" && source[prop] !== null) {
+            this.$set(target, prop, target[prop] || {});  // Create if not exists
+            this.deepMerge(source[prop], target[prop]);
+          } else {
+            target[prop] = source[prop];
+          }
+        }
+      }
     }
   },
-  components: {
-    JsonTreeRow
+  computed: {
+    jsonString() {
+      return JSON.stringify(
+        this.remoteModel,
+        (prop, val) => {
+          return prop.startsWith("__") ? undefined : val;
+        },
+        2
+      );
+    }
   },
   created() {
     var self = this;
     // Trick!
-    //self.remoteModel.model = self.$ari.remoteModel;
-    //this.$set(self.remoteModel, "model", self.$ari.remoteModel);
-
-    self.test = {test: {get time(){return time}, set time(v){time = v}}};
     self.remoteModel = self.$ari.remoteModel;
 
     // Subscribe to needed propoerty notifications.
     var time = 1;
-    var a = self.$ari.remoteModel.on("oSet", evt => {
+    var a = self.$ari.remoteModel.on("out", evt => {
       console.log("RemoteModel Event:", evt);
-      this.test.test.time++;
-      //this.$set(this.test, "time", time++);
-      //this.$set(self.remoteModel, "model", self.$ari.remoteModel);
-      var path = self.$ari.remoteModel.pathToHere(evt.target).split(".");
-      var ro = self.$ari.remoteModel;
-      while (path.length) {
-        let pp = path.shift();
-        if (!("__ob__" in ro[pp])) { 
-          // HACK: If not already a reactive object indicated by "__ob__"...
+      var ro = evt.source;
+      self.$set(ro, "__value", evt.value); //Hack to prevent enless loop when setting value, leading to emitted oSet, leading to here again!
+      while (ro && ro.__parent) {
+        if (!("__ob__" in ro)) {
+          // HACK: Non-reactive object indicated by "__ob__"...
           // HACK: Temporarily remove property from objectmodel to make vue think it adds a new object that needs to be reactive-ated. This will only be done once.
-          var tmp = ro[pp];
-          delete ro[pp];
-          self.$set(ro, pp, tmp); //obj = {};
+          var tmp = ro;
+          delete ro.__parent[ro.name];
+          self.$set(ro.__parent, ro.name, tmp);
         }
-        ro = ro[pp];
+        ro = ro.__parent;
       }
-      //self.$set(obj, "__value", evt.value); //Hack to prevent enless loop when setting value, leading to emitted oSet, leading to here again!
+    });
+
+    self.$ari.remoteModel.on("clientInfo", evt => {
+      console.log("clientInfo:", evt.value);
+      // Buid eventtree to match clientInfo.
+      self.$set(
+        self.$ari.remoteModel.Clients,
+        "Test",
+        self.$ari.remoteModel.Clients.addChild("Test")
+      );
+      self.deepMerge(evt.value, self.$ari.remoteModel);
     });
   }
 };

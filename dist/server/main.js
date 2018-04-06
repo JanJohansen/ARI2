@@ -11,9 +11,6 @@ loggingService_1.loggingService.addWriter(new loggingService_1.consoleLogWriter(
 var log = loggingService_1.loggingService.getLogger("Main");
 log.info("ARI 2.0 Starting.");
 const httpServer_1 = require("./httpServer");
-//import wsServer from './wsServer';
-//import Executor from './nodeExecutor';
-const PluginLoader_1 = require("./PluginLoader");
 const AriEventEmitter_1 = require("./AriEventEmitter");
 //import { WebSocketServer } from "ws";
 var WebSocketServer = require('ws').Server;
@@ -80,8 +77,8 @@ server.listen(3000, () => {
 });
 //*****************************************************************************
 // Start plugins
-PluginLoader_1.default.start();
+//PluginLoader.start();
 var xiaomi = new XiaomiGW_1.default();
-// import AriTest from "../common/AriObjectModel.test";
-// var a = new AriTest();
+const main_1 = require("./plugins/Flow/main");
+var a = new main_1.default();
 //# sourceMappingURL=C:/Users/jan/Desktop/ARI2/dist/server/main.js.map

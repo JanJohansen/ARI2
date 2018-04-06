@@ -1,13 +1,14 @@
 //import * as Ari from "../common/AriObjectModel";
-import { AriObjectModel, AriModelBase, AriOutputModel, AriInputModel } from "../common/AriObjectModel";
+import { AriObjectModel, AriNode, AriOutputModel, AriInputModel, AriEvent } from "../common/AriObjectModel";
 import { EventEmitter } from "events";
+import { addLocale } from "core-js";
 
 type callsHandlerType = (callName: string, parameters: any) => any;
 
-export default class AriClient {
+export default class AriClient extends EventEmitter {
 
     private __clientInfoTimer = null;
-    public onMessageOut: (message: string) => void = null;
+    public onMessageOut: (message: string) => void = null; // FIXME: Send via eventemitter
     //public name;
     private __role: string;
     private __userPassword: string;
@@ -29,39 +30,39 @@ export default class AriClient {
     public remoteModel: AriObjectModel;
 
     constructor(name: string, config?: { authToken?: string, userName?: string, userPassword?: string, attributes?: any }) {
+        super();
         config = config || {};
-
 
         this.__authToken = config.authToken || 42;    // TODO: Implement storing authToken on disk or localstorage in browser...
         this.__userName = config.userName || null;
         this.__userPassword = config.userPassword || null;
 
-        this.localModel = new AriObjectModel(null, name || "NN_Client");
-        this.localModel.on("modelUpdated", (evt) => { this.sendClientInfo(); });
         this.remoteModel = new AriObjectModel(null, name + "_remote");
-
-        // Send all local value changes (set events) to server.
-        var self = this;
-        this.localModel.on("oSet", (evt) => {
-            self.send({ cmd: "oSet", name: self.localModel.pathToHere(evt.target), value: evt.target["value"] });
-        });
-
+        this.localModel = new AriObjectModel(null, name);
+        
         this.remoteModel.on("addedListener", (evt) => {
-            if (evt.addedEventName == "oSet") {
-                // Check for any subscriptions.
-                var listeners = this.remoteModel.getListeners("oSet", true);
-                if (listeners.size == 1) self.send({ cmd: "sub", name: this.remoteModel.pathToHere(evt.target) });
-            }
+            if(evt.evt == "addedListener") return;
+            // Check for any subscriptions.
+            var listeners = this.remoteModel.getListeners(evt.evt, true);
+            if (listeners.size == 1) self.send({ cmd: "on", name: evt.evt, path: this.remoteModel.pathToHere(evt.source) });
         });
+
         this.remoteModel.on("removedListener", (evt) => {
-            if (evt.removedEventName == "oSet") {
-                // Check for any subscriptions.
-                var listeners = this.remoteModel.getListeners("oSet", true);
-                if (listeners.size == 0) self.send({ cmd: "unsub", name: this.remoteModel.pathToHere(evt.target) });
-            }
+            if(evt.evt == "removedListener") return;
+            // Check for any subscriptions.
+            var listeners = this.remoteModel.getListeners("out", true);
+            if (listeners.size == 0) self.send({ cmd: "off", name: evt.evt, path: this.remoteModel.pathToHere(evt.source) });
         });
-        this.remoteModel.on("setI", (evt) => {
-            self.send({ cmd: "setI", name: this.remoteModel.pathToHere(evt.target) });
+
+        // Send clientInfo to server if local structure was changed.
+        this.localModel.on("modelUpdated", (evt) => { 
+            this.sendClientInfo(); 
+        });
+
+        // Send all local value changes (out events) to server.
+        var self = this;
+        this.localModel.on("out", (evt) => {
+            self.send({ evt: "out", source: self.localModel.pathToHere(evt.source), value: evt.source["value"] });
         });
     }
 
@@ -73,63 +74,78 @@ export default class AriClient {
     handleMessage(json) {
         var msg;
         try {
-            console.log("JSON:", json);
+            console.log("->" + this.localModel.name, json);
             msg = JSON.parse(json);
         } catch (e) {
             console.log("Error in JSON message from server. Ignoring message.")
             return;
         }
 
-        let cmd = msg.cmd;
-        if ("_remote_" + cmd in this) this["_remote_" + cmd](msg);
-        else console.log("Error: Server trying to call unknown method:", cmd);
-    }
-
-    // ************************************************************************
-    subRemote(name: string, cb: (name: string, value: any) => void) {
-        this.send({ cmd: "sub", name: name });
-        if (name == "**") {
-            this.remoteModel.on("oSet", (evt) => { cb(evt.target.name, evt.value) });
-        } else if (name.endsWith(".**")) {
-            name = name.substring(name.length - 3);
-            var obj = this.remoteModel.findPath(name, "obj") as AriObjectModel;
-            obj.on("oSet", (evt) => { cb(evt.target.name, evt.value) });
-        } else {
-            var lio = name.lastIndexOf(".");
-            var objName = name.substring(lio);
-            var valueName = name.substring(0, lio);
-            var obj = this.remoteModel.findPath(objName, "out") as AriObjectModel;
-            if (!(valueName in obj)) obj.addOutput(valueName);
-            obj.on("oSet", (evt) => { cb(evt.target.name, evt.value) });
+        if ("evt" in msg) {
+            // No special handling. Forward cmd to client if it subscribes.
+            if ("target" in msg) {
+                var node = this.localModel.findOrCreate(msg.target);
+                node.inject({ evt: msg.evt, value: msg.value });
+            } else if ("source" in msg) {
+                // TODO: Check if this works!!
+                var node = this.remoteModel.findOrCreate(msg.source);
+                node.emit({ evt: msg.evt, value: msg.value });
+            }
+        } else if ("cmd" in msg) {
+            let cmd = msg.cmd;
+            if ("_remote_" + cmd in this) this["_remote_" + cmd](msg);
+            else console.log("Error: Server trying to call unknown method:", cmd);
         }
     }
 
-    setRemote(name, value) {
-        this.send({ cmd: "setI", name: name, value: value });
+    // ************************************************************************
+    sub(name: string, cb: (name: string, value: any) => void) {
+        this.send({ cmd: "out", name: name });
+        if (name == "**") {
+            this.remoteModel.on("out", (evt) => { cb(evt.target.name, evt.value) });
+        } else if (name.endsWith(".**")) {
+            name = name.substring(name.length - 3);
+            var obj = this.remoteModel.findOrCreate(name);
+            obj.on("out", (evt) => { cb(evt.target.name, evt.value) });
+        } else {
+            var obj = this.remoteModel.findOrCreate(name);
+            obj.on("out", (evt) => { cb(evt.target.name, evt.value) });
+            /*
+            var lio = name.lastIndexOf(".");
+            var objName = name.substring(lio);
+            var valueName = name.substring(0, lio);
+            var obj = this.remoteModel.findOrCreate(objName);
+            if (!(valueName in obj)) obj.addOutput(valueName);
+            obj.on("out", (evt) => { cb(evt.target.name, evt.value) });
+            */
+        }
     }
 
-    public _remote_oSet(msg) {
+    set(name, value) {
+        this.send({ cmd: "set", name: name, value: value });
+    }
+
+    _remote_out(msg) {
         if (!msg.name) return;
-        var obj = this.remoteModel.findPath(msg.name, "out") as AriObjectModel;
-        if (obj instanceof AriOutputModel) obj.value = msg.value;
-        else throw("Kkjhkjh");
+        var obj = this.remoteModel.findOrCreate(msg.source);
+        obj.emit({evt: "out", value: msg.value});
     }
 
-    public _remote_setI(msg) {
+    _remote_set(msg) {
         if (!msg.name) return;
         var lio = msg.name.lastIndexOf(".");
         var objName = msg.name.substring(lio);
         var valueName = msg.name.substring(0, lio);
-        var obj = this.localModel.findPath(objName, "in") as AriInputModel;
-        if (obj) obj.value = msg.value;
+        var obj = this.localModel.find(msg.name);
+        if (obj) obj.inject({evt: "set", value: msg.value});
     }
 
-    public _remote_sub(name) {
-        return this.localModel.findPath(name).on("oSet", this.remoteSubsCB);
+    _remote_sub(name) {
+        return this.localModel.find(name).on("out", this.remoteSubsCB);
     }
 
-    public _remote_unsub(msg) {
-        return this.localModel.findPath(msg.name).off("oSet", this.remoteSubsCB);
+    _remote_unsub(msg) {
+        return this.localModel.find(msg.name).off("out", this.remoteSubsCB);
     }
 
     // ************************************************************************
@@ -138,17 +154,18 @@ export default class AriClient {
     // Server calls function on this client.
     _remote_call(msg) {
         if (!msg.name) return;// log.error("Error: Missing name of function to call!");
-        var ariObj = this.localModel.findPath(msg.name);
+        var ariObj = this.localModel.find(msg.name);
         if (!ariObj) {
             this.send({ cmd: "return", id: msg.id, err: "Error: Function not found!" });
         } else {
+            //if(ariObj.__events.
             var result = ariObj[msg.name].call(msg.args);
             this.send({ cmd: "return", id: msg.id, result: result });
         }
     }
 
     // Call function on remote client.
-    async callRemote(name, args) {
+    async call(name, args) {
         var self = this;
         var reqId = self.__nextReqId++;
         this.send({ cmd: "call", id: reqId, name: name, args: args });
@@ -173,7 +190,7 @@ export default class AriClient {
     // ************************************************************************
     // Support functions
     private remoteSubsCB(ariValue) {
-        this.send({ cmd: "pub", name: ariValue.name, value: ariValue.value });
+        this.send({ cmd: "out", name: ariValue.name, value: ariValue.value });
     }
 
     // Send clientInfo after some time to allow build up of model before sending.
@@ -188,19 +205,18 @@ export default class AriClient {
 
     _sendClientInfo() {
         // Publish local pubsubtree or special message for server?
-        this.send({ cmd: "clientinfo", clientInfo: this });
+        this.send({ evt: "clientInfo", value: this.localModel, source: "" });
     }
 
 
     private send(msg) {
+        console.log("<-" + this.localModel.name, msg);
         if (this.connected && this.onMessageOut) this.onMessageOut(JSON.stringify(msg, AriClient.no__jsonReplacer));
     }
 
-
     public log(...args) {
-        this.send({ cmd: "log", message: args });
+        this.emit("log", {value: args});
     }
-
 
     private _authenticate() {
         const self = this;
@@ -225,18 +241,20 @@ export default class AriClient {
 
     _remote_authOk(msg) {
         this.localModel.name = msg.name;
-        this._sendClientInfo();
+        this.emit("authenticated");
 
-        var listeners = this.remoteModel.getListeners("oSet", true);
-        console.log("Set-listeners:", listeners.size, listeners);
-        listeners.forEach((listener) => {
-            console.log("SENDING!", this.remoteModel.pathToHere(listener));
-            this.send({ cmd: "sub", name: this.remoteModel.pathToHere(listener) });
+        // Send subscriptions that have already been requested.
+        // Get list of event names and their path nearest to the root. Subscribe to theese.
+        var listeners = this.remoteModel.getOldestEvents();
+        listeners.forEach((sourceNode, evt) => {
+            if(evt != "addedListener" && evt != "removedListener" && evt != "modelUpdated") this.send({ cmd: "on", name: evt, path: this.remoteModel.pathToHere(sourceNode) });
         });
+        this.emit("ready");
     }
 
     _remote_authNok(msg) {
-        console.log("ERROR: Authorization was denied!");
+        this.emit("error", {message: "Authentication failed!"});
+        console.log("ERROR: Authentication failed!");
     }
 
     //*****************************************************************************

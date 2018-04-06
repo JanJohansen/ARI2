@@ -93,9 +93,9 @@ server.listen(3000, () => {
 
 //*****************************************************************************
 // Start plugins
-PluginLoader.start();
+//PluginLoader.start();
 
 var xiaomi = new XiaomiGW();
 
-// import AriTest from "../common/AriObjectModel.test";
-// var a = new AriTest();
+import Flow from "./plugins/Flow/main"
+var a = new Flow();

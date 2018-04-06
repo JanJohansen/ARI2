@@ -8,7 +8,7 @@ export default class XiaomiGW {
             gateway.on('ready', () => {
                 console.log('Gateway is ready')
                 gateway.setPassword('vuxjtrix09m1eii2')
-                gateway.setColor({ r: 0, g: 0, b: 255 })
+                gateway.setColor({ r: 100, g: 100, b: 30 })
                 gateway.setIntensity(100)
             });
 
