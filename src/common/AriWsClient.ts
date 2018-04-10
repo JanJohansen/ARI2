@@ -1,6 +1,6 @@
-import AriClient from "../../dist/common/AriClient";
-//import { webSocket } from "rxjs/observable/dom/webSocket";
 //import { webSocket } from "ws";
+//import AriEventEmitter from "./AriEventEmitter";
+import AriClient from "../common/AriClient";
 
 export default class AriWsClient extends AriClient {
 
@@ -16,13 +16,13 @@ export default class AriWsClient extends AriClient {
         this.wsConnect();
 
     }
-    wsConnect() {
+    private wsConnect() {
         var self = this;
-        
+
         console.log("AriWsClient trying to connect to:", this.url);
         var ws = new WebSocket(this.url);
-        ws.onmessage = (msgEvt) => { self.handleMessage(msgEvt.data); };
-        self.onMessageOut = (message) => { ws.send(message); };
+        ws.onmessage = (msgEvt) => { self.receive(JSON.parse(msgEvt.data)); };
+        self.send = function (message) { ws.send(JSON.stringify(message, AriWsClient.no__jsonReplacer2)); };
 
         ws.onopen = () => {
             console.log("AriWsClient connected!");
@@ -36,5 +36,9 @@ export default class AriWsClient extends AriClient {
                 self.wsConnect();
             }, 2000);
         }
+    }
+    private static no__jsonReplacer2(key, value) {
+        if (key.startsWith("__")) return undefined;
+        else return value;
     }
 }

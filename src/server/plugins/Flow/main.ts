@@ -1,109 +1,104 @@
 import AriTcpClient from "../../../common/AriTcpClient";
-import { AriObjectModel, AriEvent } from "../../../common/AriObjectModel";
-
-var types = {
-    "Flow": {
-    }
-};
-
-
-var flow = {
-    nodes: {
-        nid1: {
-            nid: "nid1",
-            type: "MySGW.Device",
-            x: 50,
-            y: 10,
-            ins: {
-            },
-            outs: {
-                motion: { type: "oBoolean" },
-            }
-        },
-        nid2: {
-            nid: "nid2",
-            type: "HueGW.Lamp",
-            x: 300,
-            y: 10,
-            ins: {
-                brightness: { type: "iValue" },
-                colorTemp: { type: "oNumber" }
-            },
-            outs: {
-                brightness: { type: "oValue" },
-                colorTemp: { type: "oNumber" }
-            },
-            settings: {
-
-            }
-        },
-        nid3: {
-            nid: "nid3",
-            type: "Graph Input",
-            x: 550,
-            y: 10,
-            ins: {
-            },
-            outs: {
-                "name": {}
-            },
-            settings: {
-
-            }
-        }
-    },
-    connections: [
-        {
-            outNode: "nid1",
-            inNode: "nid2",
-            outName: "motion",
-            inName: "brightness"
-        }
-    ]
-}
 
 export default class Flow {
     constructor() {
         var client = new AriTcpClient("Flow");
-        var flow = client.localModel;
 
-        // Define own model.
-        flow.addFunction("getNodeTypeInfo", (name, args) => {
-            return {
-                "Logic.AND": {},
-                "Logic.OR": {},
-                "Logic.NOT": {},
-                "Timing.Ticker": {},
-                "Timing.Delay": {},
-                "Timing.RateLimit": {},
-                "System.Execute": {},
-                "System.Beep": {},
-                "Messaging.Email": {},
-                "Messaging.PushBullet": {},
-                "Math.Add": {},
-                "Math.Subtract": {},
-                "Math.Divide": {},
-                "Math.Multiply": {},
-                "Math.Map": {}
-            };
+        client.onLocal("ready", ()=>{
+            // Define own model.
+            client.onCall("getNodeTypeInfo", (args) => {
+                return this.nodeTypes;
+            });
+            client.onCall("getGraph", (args) => {
+    
+            });
+            client.onCall("addConnection", (args) => {
+    
+            });
+            client.onCall("addNode", (args) => {
+    
+            });
+            var counter = 0;
+            setInterval(() => {
+                client.emitLocal("counter.out", counter);
+                counter++;
+            }, 5000);
+            //client.emit("clientInfo", {...});
         });
-
-        flow.addFunction("getGraph", (name, args) => {
-
-        });
-
-        flow.addFunction("addConnection", (name, args) => {
-
-        });
-        flow.addFunction("addNode", (name, args) => {
-
-        });
-
-        var counter = flow.addOutput("flowCounter", 0);
-        setInterval(() => {
-            counter.value++;
-        }, 5000);
     }
+
+    nodeTypes = {
+        "Logic.AND": {},
+        "Logic.OR": {},
+        "Logic.NOT": {},
+        "Timing.Ticker": {},
+        "Timing.Delay": {},
+        "Timing.RateLimit": {},
+        "System.Execute": {},
+        "System.Beep": {},
+        "Messaging.Email": {},
+        "Messaging.PushBullet": {},
+        "Math.Add": {},
+        "Math.Subtract": {},
+        "Math.Divide": {},
+        "Math.Multiply": {},
+        "Math.Map": {}
+    };
+
+    flow = {
+        nodes: {
+            nid1: {
+                nid: "nid1",
+                type: "MySGW.Device",
+                x: 50,
+                y: 10,
+                ins: {
+                },
+                outs: {
+                    motion: { type: "oBoolean" },
+                }
+            },
+            nid2: {
+                nid: "nid2",
+                type: "HueGW.Lamp",
+                x: 300,
+                y: 10,
+                ins: {
+                    brightness: { type: "iValue" },
+                    colorTemp: { type: "oNumber" }
+                },
+                outs: {
+                    brightness: { type: "oValue" },
+                    colorTemp: { type: "oNumber" }
+                },
+                settings: {
+
+                }
+            },
+            nid3: {
+                nid: "nid3",
+                type: "Graph Input",
+                x: 550,
+                y: 10,
+                ins: {
+                },
+                outs: {
+                    "name": {}
+                },
+                settings: {
+
+                }
+            }
+        },
+        connections: [
+            {
+                outNode: "nid1",
+                inNode: "nid2",
+                outName: "motion",
+                inName: "brightness"
+            }
+        ]
+    };
 }
 
 //*****************************************************************************

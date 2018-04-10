@@ -2,7 +2,6 @@ import { loggingService, consoleLogWriter } from './loggingService';
 var log = loggingService.getLogger("AriTcpClientServer");
 
 import * as net from "net";
-import RpcHandler from "../common/RpcHandler";
 import JsonSeparator from "../common/JsonSeparator";
 import AriClientServer from "./ariClientServer";
 
@@ -10,21 +9,18 @@ export default class AriTcpClientServer extends AriClientServer {
 
     constructor(socket: net.Socket) {
         super();
+        var jsonSeparator = new JsonSeparator();
 
-        var self = this;
+        socket.on("data", (data) => { log.trace(this.name + "->Server:", data); jsonSeparator.receive(data); });
+        jsonSeparator.onReceive = (msg) => this.receive(msg);
 
-        let jsonifier = new JsonSeparator();
-        let rpc = new RpcHandler();
-
-        socket.on("data", (data) => { jsonifier.dataIn(data); });
-        jsonifier.on("jsonOut", (json) => { log.trace("->Server:", json); this.handleMessage(json); });
-
-        this.on("toClient", (message) => { log.trace("<-Server:", message); socket.write(message); });
+        this.onSend = (msg) => jsonSeparator.send(msg);
+        jsonSeparator.onSend = (msg) => { log.trace(this.name + "<-Server:", msg); socket.write(msg); };
 
         socket.on("end", () => {
             // destroy and free this object!!!
-            rpc = null;
-            jsonifier = null;
+            this.disconnect();
+            jsonSeparator = null;
             // TBD: Check for mem-leak!!!
         });
     }

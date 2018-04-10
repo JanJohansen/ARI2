@@ -14,8 +14,7 @@ import { httpServer } from './httpServer';
 //import wsServer from './wsServer';
 //import Executor from './nodeExecutor';
 import PluginLoader from './PluginLoader';
-import AriClientServer from './ariClientServer';
-import AriEventEmitter from './AriEventEmitter';
+import AriEventEmitter from '../common/AriEventEmitter';
 //import { WebSocketServer } from "ws";
 var WebSocketServer = require('ws').Server;
 import * as net from "net";
@@ -25,12 +24,6 @@ import AriWsClientServer from './AriWsClientServer';
 import XiaomiGW from "./XiaomiGW";
 
 //*****************************************************************************
-var ariEvents: any = AriEventEmitter.getInstance();
-
-ariEvents.onAny((event, args) => {
-    log.trace("AriEvent:", event);//, args);
-});
-
 // Log uncaught exceptions.
 process.on('uncaughtException', function (error) {
     log.fatal("!!!!!! ", error);
@@ -73,7 +66,6 @@ var wss = new WebSocketServer({ server: http.server });
 
 // Set up "mediator" between components.
 wss.on("connection", (ws) => {
-    log.trace("Client connecting");
     var awscs = new AriWsClientServer(ws);
 });
 

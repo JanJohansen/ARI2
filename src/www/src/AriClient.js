@@ -1,4 +1,4 @@
-import AriWsClient from "../../common/AriWsClient"
+import AriWsClient from "../../../dist/common/AriWsClient"
 
 export default {
     install: function (Vue, name = "$ari") {

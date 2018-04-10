@@ -11,7 +11,6 @@ loggingService_1.loggingService.addWriter(new loggingService_1.consoleLogWriter(
 var log = loggingService_1.loggingService.getLogger("Main");
 log.info("ARI 2.0 Starting.");
 const httpServer_1 = require("./httpServer");
-const AriEventEmitter_1 = require("./AriEventEmitter");
 //import { WebSocketServer } from "ws";
 var WebSocketServer = require('ws').Server;
 const net = require("net");
@@ -19,10 +18,6 @@ const AriTcpClientServer_1 = require("./AriTcpClientServer");
 const AriWsClientServer_1 = require("./AriWsClientServer");
 const XiaomiGW_1 = require("./XiaomiGW");
 //*****************************************************************************
-var ariEvents = AriEventEmitter_1.default.getInstance();
-ariEvents.onAny((event, args) => {
-    log.trace("AriEvent:", event); //, args);
-});
 // Log uncaught exceptions.
 process.on('uncaughtException', function (error) {
     log.fatal("!!!!!! ", error);
@@ -59,7 +54,6 @@ var http = new httpServer_1.httpServer();
 var wss = new WebSocketServer({ server: http.server });
 // Set up "mediator" between components.
 wss.on("connection", (ws) => {
-    log.trace("Client connecting");
     var awscs = new AriWsClientServer_1.default(ws);
 });
 //*****************************************************************************

@@ -1,47 +1,46 @@
 import { EventEmitter } from "events";
 
-export default class JsonSeparator extends EventEmitter {
+export default class JsonSeparator {
 
     message = "";
-    bCount = 0;
-    msg = undefined;
     brCount = 0;
 
-    constructor(){
-        super();
-    }
-
-    dataIn(data) {
+    constructor() { }
+    onSend(msg: Object) { throw ("Error: onSend needs to be overwritten to handle transmission of data.") };
+    onReceive(msg: Object) { throw ("Error: onReceive needs to be overwritten to handle reception of data.") };
+    onError(reason: string) { console.log("Error in JsonSeparator:", reason) }; // Optional overwrite.
+    receive(data) {
         var data = data.toString();
         for (var i = 0; i < data.length; i++) {
             if (data[i] == '{') this.brCount++;
             else if (data[i] == '}') this.brCount--;
             if (this.brCount == 0) {
-                this.message += data.substring(0, i+1);
+                this.message += data.substring(0, i + 1);
                 data = data.slice(i + 1);
                 i = -1; // Will be incremented to 0 next for loop!
 
-/*                try {
-                    this.msg = JSON.parse(this.message);
+                var msg;
+                try {
+                    msg = JSON.parse(this.message);
                 } catch (e) {
-                    console.log("ERROR: Incorrectly formatted JSON in message!");
+                    this.onError("ERROR: Incorrectly formatted JSON in message!");
                 }
-                
-                if (this.msg) {
-                    console.log("Message:", this.message.toString());
-                    */
-                    this.emit("jsonOut", this.message);
-                //}
+
+                if (msg) this.onReceive(msg);
                 this.message = "";
-                this.msg = undefined;
             }
         }
         if (this.brCount != 0) {
             this.message += data;    // Inbetween data chunks...
         }
     };
+    send(data) {
+        var json = JSON.stringify(data, JsonSeparator.no__jsonReplacer);
+        this.onSend(json);
+    }
 
-    jsonIn(json) {
-        this.emit("dataOut", json);
-    };
+    static no__jsonReplacer(key, value) {
+        if (key.startsWith("__")) return undefined;
+        else return value;
+    }
 }

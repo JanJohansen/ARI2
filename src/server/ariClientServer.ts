@@ -1,156 +1,177 @@
 import { loggingService, consoleLogWriter } from './loggingService';
 var log = loggingService.getLogger("ariClientServer");
 
-import { EventEmitter } from 'events';
-import { AriNode, AriObjectModel, AriEvent } from "../common/AriObjectModel";
+import { EventEmitter2 } from 'eventemitter2';
 
-type callsHandlerType = (callName: string, parameters: any) => any;
+interface ClientData {
+    clientServer: AriClientServer;
+    clientInfo?: any;
+}
 
-export default class AriClientServer extends EventEmitter {
+export default class AriClientServer {
 
-    private static aliases: string[] = [];
-    public static ariRoot = new AriNode(null, "AriRoot");
-    private ariRoot = AriClientServer.ariRoot;
-    private ariThis: AriNode;
+    private static ariClients: { [name: string]: ClientData } = {}; // All connected and authenticated clients.
+    private static ariRoot = new EventEmitter2({ wildcard: true, delimiter: '.', newListener: false, maxListeners: 100, verboseMemoryLeak: true });
 
-    private name;
-    private _nextReqId = 0;        // Id to use for identifying requests and corresponding response callbacks.
-    private _pendingCallbacks = {};// Callbacks for pending server requests.
-
-    private _callsHandler: callsHandlerType = null;
-    private subCBFunc = this.subCB.bind(this);
+    public name;
     private connected = false;
+    private authenticated = false;
+    private clientData: ClientData = null;        // Contains data pertaining to this client.
+    private ariRoot = AriClientServer.ariRoot;
+    private throttle: number = 0;
+    private nextCallId = 0;
+    private pendingCalls = {};
+    private functions = {};
+    private collection = null;
+    private subs: {[eventName: string]: (any)=>void} = {};  // Contains props of all evennames that this client subscribes to. (To be able to unsub at disconnect!.)
 
     constructor() {
-        super();
         this.connected = true;
-
         // Special out handling for server!
-        this.ariRoot.on("out", (evt) => {
-            evt.source.value = evt.value;
-        });
+        // this.ariRoot.on("out", (evt) => {
+        //     evt.source.value = evt.value;
+        // });
     }
 
-    handleMessage(json) {
-        //log.debug("HandleMsg:", json);
-        var msg;
-        try {
-            msg = JSON.parse(json);
-        } catch (e) {
-            log.error("Error in JSON message from server. Ignoring message.")
-        }
-
-        if ("evt" in msg) {
-            // No special handling. Forward cmd to client if it subscribes.
-            if ("target" in msg) {
-                var node = this.ariRoot.findOrCreate(msg.target);
-                node.inject({ evt: msg.evt, value: msg.value });
-            } else if ("source" in msg) {
-                // TODO: Check if this works!!
-                //var node = this.ariRoot.findOrCreate("Clients." + this.name + "." + msg.source);
-                //if(msg.evt == "clientInfo")
-                //    console.log("!!!");
-                var node = this.ariThis.findOrCreate(msg.source);
-                node.emit({ evt: msg.evt, value: msg.value });
-            }
-        } else if ("cmd" in msg) {
+    //*************************************************************************
+    // Connection handling
+    receive(msg) {
+        if ("cmd" in msg) {
             let cmd = msg.cmd;
-            if ("_remote_" + cmd in this) this["_remote_" + cmd](msg);
+            if ("_cmd_" + cmd in this) this["_cmd_" + cmd](msg);
             else console.log("Error: Server trying to call unknown method:", cmd);
         }
     }
+    // Override to use class.
+    onSend(message: any): void {
+        throw ("Error: onSend function MUST be overriddedn to handle transmission of messages to client.")
+    };
+    private send(msg) {
+        if (this.connected) this.onSend(msg);
+    }
+    disconnect() {
+        this.connected = false;
 
-    //*************************************************************************
-    // IO handling
-    _remote_on(msg) {
-        var obj = this.ariRoot.findOrCreate(msg.path);
-        obj.on(msg.name, this.subCBFunc);
+        // Unsubscribe from events for this client.
+        for (let name in this.subs) {
+            this.ariRoot.off(name, this.subs[name]);
+        }
 
-        // Special handling for server... 
-        // Traverse eventtree to send out-values that have values stored on them.
-        this.traverseAll(obj, (node) => {
-            if ("value" in node) {
-                this.send({ evt: "out", source: this.ariRoot.pathToHere(node), value: node.value });
-            }
-        });
+        this.clientData.clientServer = null;
+        if (!this.clientData.clientInfo) delete AriClientServer.ariClients[this.name];
     }
 
-    traverseAll(obj: AriNode, cb: (node: AriNode) => void) {
-        cb(obj);
-        for (let prop in obj) {
-            if (obj[prop] instanceof AriNode && obj[prop] as any != obj.__parent) this.traverseAll(obj[prop], cb);
+    // ************************************************************************
+    // Event handling.
+    private _cmd_evt(msg) {
+        this.ariRoot.emit(msg.name, msg.args);
+    }
+    private _cmd_on(msg) {
+        var subCb = this.collectSubCbs.bind(this);
+        this.ariRoot.on(msg.name, subCb);
+        // Store in local sub list, to allow removing subscriptions on disconnect.
+        this.subs[msg.name] = subCb;
+        // Send sub to affected clients
+        this.forwardMsg(msg);
+    }
+    private _cmd_off(msg) {
+        this.ariRoot.off(msg.name, this.subs[msg.name]);
+        delete this.subs[msg.name];
+        // Send unsub to affected clients
+        this.forwardMsg(msg);
+    }
+    private forwardMsg(msg: any) {
+        var name = msg.name.split(".");
+        if (name[0].startsWith("*")) {
+            // Send to all clients except this one!.
+            for (let name in AriClientServer.ariClients) {
+                var remoteClientData = AriClientServer.ariClients[name];
+                if (remoteClientData.clientServer != this) {
+                    if (remoteClientData.clientServer.authenticated) {
+                        remoteClientData.clientServer.send(msg);
+                    }
+                }
+            }
+        }
+        else if (name[0] in AriClientServer.ariClients) {
+            var remoteClientData = AriClientServer.ariClients[name[0]];
+            if (remoteClientData.clientServer.authenticated) {
+                remoteClientData.clientServer.send(msg);
+            }
+        }
+    }
+    // Collect callbacks for same event to avoid sending same event more than once.
+    private collectSubCbs(args) {
+        var name = this.ariRoot.event;
+        if (!this.collection) {
+            this.collection = {};
+            // Send/flush AFTER all listeners that listen to events have been fired.
+            process.nextTick(this.flush.bind(this));
+        }
+        this.collection[name] = args;
+        console.log(this.name, "collecting (" + Object.keys(this.collection).length + "):", name, "=", args);
+    }
+    // Send collected events. Can allso be called in certain cases where colecting events is not desired (function "call"s, and command like events.)
+    public flush() {
+        if (this.collection) {
+            //log("Collected:", this.collection);
+            for (let evt in this.collection) {
+                this.send({ cmd: "evt", name: evt, args: this.collection[evt] });
+            }
+            this.collection = null;
         }
     }
 
-    subCB(evt) {
-        if ("source" in evt) this.send({ evt: evt.evt, source: this.ariRoot.pathToHere(evt.source), value: evt.value });
-        if ("target" in evt) this.send({ evt: evt.evt, target: this.ariThis.pathToHere(evt.target), value: evt.value });
-    }
+    // ************************************************************************
+    // Call handling.
 
-    //*************************************************************************
-    // Function handling
-    _remote_call(msg) {
-        var ariFunction = this.ariRoot.findOrCreate(msg.name);
-        ariFunction.inject({ evt: "call", value: { id: this._nextReqId++, args: msg.args } });
+    private _cmd_call(msg) {
+        if (!(msg.name in AriClientServer.ariClients)) this.send({ cmd: "return", err: "Unknown function name when trying to call: " + msg.name, cid: msg.cid });
+        var targetClientInfo = AriClientServer.ariClients[msg.name];
+        var result = this.functions[msg.name](msg.args);
+        this.send({ cmd: "return", result: result, cid: msg.cid });
     }
-    _remote_return(msg) {
-        //var ariFunction = this.ariRoot.findOrCreate(msg.name);
-        //ariFunction.dispatchEvent(new AriEvent("call", { target: ariFunction, args: msg.args }));
-    }
-
-    //*************************************************************************
-    // support functions
-    static no__jsonReplacer(key, value) {
-        if (key.startsWith("__")) return undefined;
-        else return value;
-    }
-
-    private send(msg) {
-        if (this.connected) this.emit("toClient", JSON.stringify(msg, AriClientServer.no__jsonReplacer));
-    }
-
-    disconnect() {
-        this.connected = false;
-        this.ariThis.clearListeners("out", this.subCBFunc);
-        this.ariThis["__ClientServer"] = null;
-        this.ariThis["__authenticated"] = false;
-        //ariThis.outs.connected.value = false;
+    private _cmd_return(msg) {
+        if (!(msg.cid in this.pendingCalls)) return;    // callId not awaited! - Ignore!
+        this.pendingCalls[msg.cid](msg.result);
+        delete this.pendingCalls[msg.cid];
     }
 
     //*************************************************************************
     // Authentication handling
-    _remote_auth(msg) {
+    _cmd_auth(msg) {
         if (msg.token == 42) {
             // TODO: Use name from authToken since this is registered with ari!
             this.name = this.generateUniqueName(msg.name);
+            this.authenticated = true;
 
-            this.ariThis = this.ariRoot.findOrCreate("Clients." + this.name) as any;
-            this.ariThis.__clientServer = this;
-            this.ariThis.__authenticated = true;
-            //ariThis.addOutput("connected");
-            //ariThis.outs.connected.value = true;
+            if (!(this.name in AriClientServer.ariClients)) AriClientServer.ariClients[this.name] = { clientServer: this };
+            this.clientData = AriClientServer.ariClients[this.name];
 
-            this.ariThis.on("call", (evt) => {
-                // Someone requested to call function on this connected client.
-                this.send({ evt: "call", name: evt.target.name, args: evt.value });
-            });
-            this.ariThis.on("clientInfo", (evt) => {
-                // FIXME:
-                log.debug("*** ClientInfoEvt:", evt);
-                
-                
-            });
+            this.send({ cmd: "authOk", name: this.name, "token": 42 }); // No checks for now.
 
-            this.send({ cmd: "authOk", name: msg.name, "token": 42 }); // No checks for now.
+            // Send existing subscriptions valid for this client.
+            var allSubs = new Set<string>();
+            for(let name in AriClientServer.ariClients){
+                var client = AriClientServer.ariClients[name];
+                for(let subName in client.clientServer.subs){
+                    allSubs.add(subName);
+                }
+            }
+            for (let evt of allSubs) {
+                let name = evt.split(".");
+                if (name[0].startsWith("*") || name[0] == this.name) {
+                    this.send({ cmd: "on", name: evt });
+                }
+            }
         }
-        else this.send({ cmd: "authNok", name: msg.name, "token": 42 }); // No checks for now.
+        //else ignore untill correct authentication request is received.
     }
 
     generateUniqueName(name) {
         var newName = name;
         var idx = 1;
-        var clients = this.ariRoot.findOrCreate("Clients");
-        while (newName in clients) {// && (clients[newName] instanceof AriObjectModel)) {
+        while (newName in AriClientServer.ariClients) {
             newName = name + "(" + idx.toString() + ")";
             idx++;
         }
@@ -158,20 +179,10 @@ export default class AriClientServer extends EventEmitter {
     }
 
     //*************************************************************************
-    // Client info handling
-    _remote_clientinfo(msg) {
-        var clientInfo = msg.clientInfo;
-        log.trace("_remote_CLIENTINFO", clientInfo);
-
-        // log.debug("New clientInfo from", clientName, ":", JSON.stringify(clientInfo, null, "\t"));
-
-        // Merge client info with present info... Remove values, functions, etc. not in Info from client.
-        //var clientModel = this.ariRoot.findOrCreate("Clients." + this.name);
-
-        //clientModel.updateModel(clientInfo);
-
-        // Make sure name is the one used in token!. (E.g. given name from server and not the default name from client.)
-        //        clientModel.name = this.name;
+    // support functions
+    static no__jsonReplacer(key, value) {
+        if (key.startsWith("__")) return undefined;
+        else return value;
     }
 
     // Delete object members of target that are not in model. Leave all value members. Ignore "__" double underscored members.
@@ -199,12 +210,4 @@ export default class AriClientServer extends EventEmitter {
         }
         return target;
     };
-
-
-    //*************************************************************************
-    // Alias handling
-    // Find alias. Return name for alias if found. Return same name if not found.
-    resolveAlias(alias) {
-        return AriClientServer.aliases[alias] || alias;
-    }
 }

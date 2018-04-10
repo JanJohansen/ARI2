@@ -120,34 +120,63 @@ emit("out", 42); -> event has source added (=this) (will be resolved to path bef
 emit("call", "path", args); -> event has "target" added = "path"
 
 
-# Message model for ARI: 
+# Message model for ARI systems: 
 
-    ->server: {auth: {token: "jhgjhgguh"}}
-    <-server: {authOk: {name: "WebClient(1)"}}
+    ->server: {cdm:"auth", name: "WebClient", token: "42"}
+    <-server: {cmd:"authOk", name: "WebClient(1)", token: "42"}
+
+    ->server: cmd:"on"
+
+## Client local message model:
+    local.** is used for local events
+    remoteClientName.** is used for remote clients events
+
+## Server message model:
+    clientName.** is used for all events
+
+## client subscribes to remote event:
+    @ Client    on(newListener, (name)=>{server.send(cmd:on, name, name)});
+    @ Client    ari.on("remoteClientName.**", ()=>{...});
+    @ server    
+
+# Use cases
+## motion -> flow -> lamp
     
-    ARI.BootTime = {ts:Z20180219112800123} 
-    {cmd:"set", pars:{name:"ARI.BootTime", val: {ts:Z20180219112800123} } }
-    ARI.Time = {v:"123000"} 
-    ARI.services = {v:["HueGW"], ts:Z20180219112800123} 
+    flow.on("MotionSensor.motion.out", (val)=>{flow.emit("Lamp.brightness.set", 1)});
+        @ Flow:     on "MotionSensor.motion.out" send "Lamp.brightness.set" = 1
+        @ Flow:     ->server: { cmd: on, name: "Motion.motion.out" }
+        @ Server:   on "Motion.motion.out" send to Flow
+        @ Server:   ->Motion: { cmd: on, name: "motion.out" }}
+        @ Motion:   on "_.motion.out" send to Server
+    
+    lamp.onLocal("brightness.set", (val)=>{brigtness = val;});
+    
+    motion.emit("motion.out", 1);
+        @ Motion:   emit("_.motion.out", 1)
+        @ Motion:   ->Server: {cmd: evt, name: "Motion.motion.out", 1}
+        @ Server:   ->Flow: {cmd: evt, name: "Motion.motion.out", 1}
+        @ Flow:     ->Server: {cmd: evt, name: "Lamp.brightness.set", 1}
+        @ Server:   ->Lamp: {cmd: evt, name: "Lamp.brightness.set", 1}
+        @ Lamp:     Set brightness
 
-    Service.HueGW.clientInfo = {v:"clientInfo", ts:Z20180219112800123} 
-    Service.HueGW.connected = {v:"2", ts:Z20180219112800123} 
+## All outputs -> Web
+    
+    web.on("**.out", ...});
+        @ Web:      ->server: { cmd: on, name: "**.out" }
+        @ Server:   on "Motion.motion.out" send to Flow
+        @ Server:   ->Motion: { cmd: on, name: "motion.out" }}
+        @ Motion:   on "_.motion.out" send to Server
+    
+    lamp.onLocal("brightness.set", (val)=>{brigtness = val;});
+    
+    motion.emit("motion.out", 1);
+        @ Motion:   emit("_.motion.out", 1)
+        @ Motion:   ->Server: {cmd: evt, name: "Motion.motion.out", 1}
+        @ Server:   ->Flow: {cmd: evt, name: "Motion.motion.out", 1}
+        @ Flow:     ->Server: {cmd: evt, name: "Lamp.brightness.set", 1}
+        @ Server:   ->Lamp: {cmd: evt, name: "Lamp.brightness.set", 1}
+        @ Lamp:     Set brightness
 
-    Service.HueGW.Lights.Lamp1.brightness.out = {v:0.5, ts:Z20180219112800123} 
-    Service.HueGW.Lights.Lamp1.brightness.in = {v:0.5, ts:Z20180219112800123} 
-
-    Service.HueGW.getConfig.call = {req:123, pars:{...}} 
-    Service.HueGW.getConfig.reply = {res:123, result:{...}} 
-
-    Service.AriLogger.getLog.call = {req:123, pars:{parameterName:, startTime?, endTime?:, reolution?:}} 
-    Service.AriAliaser.getList.call = {req:123, pars:{parameterName:, startTime?, endTime?:, reolution?:}} 
-    Service.AriAliaser.setAlias.call = {req:123, pars:{x:y, z:w}} 
-
-
-    {cmd:"sub", name:"Service.HueGW.Lights.Lamp1.brightness.out" }
-    {cmd:"evt", name:"Service.HueGW.Lights.Lamp1.brightness.out", val:{v:0.5, ts:Z20180219112800123} }
-    {cmd:"req", name:"Service.HueGW.getConfig.call",  data: {reqId: 123, pars: {...}} }
-    {cmd:"res", name:"Service.HueGW.getConfig.reply", data: {reqId: 123, result:{...}} } 
 
 
 

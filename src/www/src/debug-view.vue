@@ -38,9 +38,9 @@ export default {
     },
     deepMerge(source, target) {
       for (var prop in source) {
-        if (!prop.startsWith("__")){
+        if (!prop.startsWith("__")) {
           if (typeof source[prop] === "object" && source[prop] !== null) {
-            this.$set(target, prop, target[prop] || {});  // Create if not exists
+            this.$set(target, prop, target[prop] || {}); // Create if not exists
             this.deepMerge(source[prop], target[prop]);
           } else {
             target[prop] = source[prop];
@@ -62,36 +62,33 @@ export default {
   },
   created() {
     var self = this;
-    // Trick!
-    self.remoteModel = self.$ari.remoteModel;
 
-    // Subscribe to needed propoerty notifications.
-    var time = 1;
-    var a = self.$ari.remoteModel.on("out", evt => {
-      console.log("RemoteModel Event:", evt);
-      var ro = evt.source;
-      self.$set(ro, "__value", evt.value); //Hack to prevent enless loop when setting value, leading to emitted oSet, leading to here again!
-      while (ro && ro.__parent) {
-        if (!("__ob__" in ro)) {
-          // HACK: Non-reactive object indicated by "__ob__"...
-          // HACK: Temporarily remove property from objectmodel to make vue think it adds a new object that needs to be reactive-ated. This will only be done once.
-          var tmp = ro;
-          delete ro.__parent[ro.name];
-          self.$set(ro.__parent, ro.name, tmp);
+    self.$ari.onLocal("ready", function(){
+      // Subscribe to needed propoerty notifications.
+      var time = 1;
+      var a = self.$ari.on("**.out", function(args) {
+        console.log(this.event, "=", args);
+
+        var path = this.event.split(".");
+        var o = self.remoteModel;
+        while (path.length > 0) {
+          let prop = path.shift();
+          if(!(prop in o)) self.$set(o, prop, {});
+          o = o[prop];
         }
-        ro = ro.__parent;
-      }
-    });
+        self.$set(o, "__value", args);
+      });
 
-    self.$ari.remoteModel.on("clientInfo", evt => {
-      console.log("clientInfo:", evt.value);
-      // Buid eventtree to match clientInfo.
-      self.$set(
-        self.$ari.remoteModel.Clients,
-        "Test",
-        self.$ari.remoteModel.Clients.addChild("Test")
-      );
-      self.deepMerge(evt.value, self.$ari.remoteModel);
+      // self.$ari.on("*.clientInfo", function(args) {
+      //   console.log("clientInfo:", args);
+      //   // Buid eventtree to match clientInfo.
+      //   // self.$set(
+      //   //   self.$ari.remoteModel.Clients,
+      //   //   "Test",
+      //   //   self.$ari.remoteModel.Clients.addChild("Test")
+      //   // );
+      //   // self.deepMerge(evt.value, self.$ari.remoteModel);
+      // });
     });
   }
 };
